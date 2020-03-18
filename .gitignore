@@ -1,0 +1,18 @@
+!.gitignore
+
+# visual studio files
+/.vscode/
+
+# python
+__pycache__/
+*.cprofile
+*.pyc
+
+# saved data files
+/data
+
+# for mac
+.DS_Store
+
+test.py
+note.txt
