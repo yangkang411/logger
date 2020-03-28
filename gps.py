@@ -93,6 +93,10 @@ def gpst2utc(t):
     return (t - 18.0)
 
 def gps_time_test():
+    '''
+    Ref:https://www.labsat.co.uk/index.php/en/gps-time-calculator
+    Verification of convert GPS time to UTC.
+    '''    
     week = 2097
     sec = 110353.200 
     time_gps = gpst2time(week, sec) # float, seconds
