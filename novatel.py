@@ -22,7 +22,7 @@ import gps
 
 def main():
     '''main'''
-    novatel_ref = r"/Users/songyang/project/analyze/drive_test/2020-3-16/novatel_ref/novatel_CPT7-2020_03_16_13_36_48.ASC"
+    novatel_ref = r"/Users/songyang/project/analyze/drive_test/2020-3-16/novatel_ref/novatel_CPT7-2020_03_16_14_39_25.ASC"
 
     start_time = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     if not os.path.exists('data/'):
@@ -30,7 +30,7 @@ def main():
     file_dir = os.path.join('data', 'novatel_'+ start_time+'.csv')
     print('Start: {0}'.format(file_dir))
     ref_file = open(file_dir, 'w')
-    header = 'Time,GPS_week,time(sec),lat(deg),lon(deg),alt(m),roll(deg),pitch(deg)'
+    header = 'Time,GPS_week,time(sec),lat(deg),lon(deg),alt(m),roll(deg),pitch(deg),yaw(deg)'
     ref_file.write(header + '\n')
     ref_file.flush()
 
@@ -48,13 +48,17 @@ def main():
                     altitude = item[13] # m
                     roll = item[18]  # deg
                     pitch = item[19] # deg
+                    yaw = item[20] # deg
 
                     time_gps = gps.gpst2time(int(GPS_week), float(GPS_second))
                     time_utc = gps.gpst2utc(time_gps)
                     time = gps.time2epoch(time_utc)
                     time_stamp = time.strftime("%Y-%m-%d_%H:%M:%S.%f")[:-3]
 
-                    str = '{0},{1},{2},{3},{4},{5},{6},{7}\n'.format(time_stamp, GPS_week, GPS_second,latitude,longitude,altitude,roll,pitch)
+                    str = '{0},{1},{2},{3},{4},{5},{6},{7},{8}\n'.  \
+                        format(time_stamp, GPS_week, GPS_second,    \
+                            latitude,longitude,altitude,roll,pitch,yaw)
+
                     ref_file.write(str)
                     ref_file.flush()
                 elif line.startswith('#RAWIMUSXA'):
