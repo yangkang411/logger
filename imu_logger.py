@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*
 """
-Driver for OpenIMU.
+Read, parse and save IMU data via serial port or binary file.
 Created on 2020-3-11
 @author: Ocean
 """
@@ -131,6 +131,7 @@ class IMULogger:
                             if self.b_send_reset_cmd:
                                 self.b_send_reset_cmd = False
                                 cmd = [0X55,0X55,0X53,0X52,0X00,0X7E,0X4F] # SOFTWARE_RESET
+                                # cmd = [0X55,0X55,0X50,0X52,0X00,0X27,0X1F] # PROGRAM_RESET
                                 self.write(cmd)
 
                         else:
@@ -237,6 +238,9 @@ class IMULogger:
             pass
         elif self.packet_type == 's2':
             pass
+        elif self.packet_type == 'A2': # MTLT-305
+            self.handle_packet_A2(frame)
+            pass
 
     def calc_crc(self,payload):
         '''Calculates CRC per 380 manual
@@ -323,11 +327,98 @@ class IMULogger:
         if self.lines % 1000 == 0:
             print("[{0}]:Log counter: {1}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.lines))
 
-    def get_data_from_serial_port(self):
+    def handle_packet_A2(self, frame, save_as_sim_fmt = False):
+        '''
+        Parse 'A2' packet.
+        save_as_sim_fmt: 
+            False: Default, save log as 'A2' order.
+            True: Save log as sim format which can be used in dmu380_sim_src.
+                  [accel: g, gyro: deg/sec, mag: Gauss, AccTemp, RateTemp]
+
+            Please refer to page 37 of MTLT305D manual for A2 packet format.
+            
+        '''
+        PAYLOAD_IDX = 5
+        PAYLOAD_LEN = 30 # 0X1E
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
+
+        pack_fmt = '>12hIH' # Note: Big Endian!
+        len_fmt = '{0}B'.format(PAYLOAD_LEN)
+        payload = frame[PAYLOAD_IDX : -2]
+
+        if self.first_line:
+            self.first_line = False
+            if not os.path.exists('data/'):
+                os.mkdir('data/')
+            file_dir = os.path.join('data', self.packet_type+'_'+ self.start_time+'.csv')
+            print('Start logging:{0}'.format(file_dir))
+            self.log_file = open(file_dir, 'w')
+
+            if not save_as_sim_fmt: # save log as 'A2' packet
+                header = 'pc_tm, roll, pitch, yaw,       \
+                        gyro_x, gyro_y, gyro_z,          \
+                        acc_x, acc_y, acc_z,             \
+                        xRateTemp, yRateTemp, zRateTemp, \
+                        timeITOW, BITstatus'.replace(' ', '')
+                self.log_file.write(header + '\n')
+                self.log_file.flush()
+
+        try:
+            b = struct.pack(len_fmt, *payload)
+            d = struct.unpack(pack_fmt, b)
+        except Exception as e:
+            print("Decode payload error: {0}".format(e)) 
+
+        s = 360/math.pow(2, 16) # [360°/2^16]
+        roll    = d[0] * s # roll  in [deg]
+        pitch   = d[1] * s # pitch in [deg]
+        yaw = d[2] * s # yaw   in [deg]
+
+        s = 1260/math.pow(2, 16) # [1260°/2^16]
+        gyro_x = d[3] * s # Corrected gyro_x in [deg/sec]
+        gyro_y = d[4] * s # Corrected gyro_y in [deg/sec]
+        gyro_z = d[5] * s # Corrected gyro_z in [deg/sec]
+
+        s = 20/math.pow(2, 16) # [20/2^16]
+        accel_x = d[6] * s # xAccel in [g]
+        accel_y = d[7] * s # yAccel in [g]
+        accel_z = d[8] * s # zAccel in [g]
+
+        s = 200/math.pow(2, 16) # [200/2^16]
+        xRateTemp = d[9] * s  # xRateTemp in [C]
+        yRateTemp = d[10] * s # yRateTemp in [C]
+        zRateTemp = d[11] * s # zRateTemp in [C]
+        
+        timeITOW  = d[12] # DMU ITOW in [ms]
+        BITstatus = d[13] # Master BIT and Status
+
+
+        if not save_as_sim_fmt: # Save log as 'A2' packet
+            str = '{0},{1:f},{2:f},{3:f},{4:f},         \
+                {5:f},{6:f},{7:f},{8:f},{9:f},{10:f},   \
+                {11:f},{12:f},{13:d},{14:d}'            \
+                .format(tm_ms, roll, pitch, yaw,        \
+                        gyro_x, gyro_y, gyro_z,         \
+                        accel_x, accel_y, accel_z,      \
+                        xRateTemp, yRateTemp, zRateTemp,\
+                        timeITOW, BITstatus).replace(' ', '')
+        # else:# Save log as sim format. Save 'roll' and 'pitch' in last two columns.
+        #     str = '{0:f},{1:f},{2:f},{3:f},{4:f},{5:f},     \
+        #            {6:f},{7:f},{8:f},{9:f},{10:f},{11:f},   \
+        #            {12:f},{13:f},{14:f},{15:f}'             \
+        #         .format(d[7]/GRAVITY, d[8]/GRAVITY, d[9]/GRAVITY, d[4], d[5], d[6], \
+        #                 0, 0, 0, 0, 0, 0, 0, 0, d[2],d[3]).replace(' ', '')
+
+        self.log_file.write(str + '\n')
+        self.log_file.flush()
+        self.lines += 1
+        if self.lines % 1000 == 0:
+            print("[{0}]:Log counter: {1}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.lines))
+
+    def get_data_from_serial_port(self, port, baud):
         self.cmt = communicator.SerialPort()
-        self.cmt.port = '/dev/cu.usbserial-AH01EAT5' 
-        # self.cmt.port = '/dev/cu.usbserial-143400' 
-        self.cmt.baud = 230400
+        self.cmt.port = port
+        self.cmt.baud = baud
 
     def get_data_from_file(self):
         data_file = '/Users/songyang/project/analyze/drive_test/2020-3-11/log/drive_short/300RI.bin'
@@ -343,11 +434,23 @@ def play_sound(sentence):
     os.system(cmd)
 
 
+'''
+Please check below items:
+1. Set SOFTWARE_RESET if desired. SOFTWARE_RESET is usless for MTLT305
+2. Config serial port and baud.
+3. 
+'''
 def main():
     '''main'''
     logger = IMULogger()
-    logger.set_reset_flag(True) # reset IMU when receive the first packet.
-    logger.get_data_from_serial_port()
+    logger.set_reset_flag(False) # True: reset IMU when receive the first packet.
+
+    # config serial port parameters.
+    port = '/dev/cu.usbserial'#'/dev/cu.usbserial-AH01EAT5'  
+    baud = 230400 # 57600 # 230400
+
+    # chose get data from serial or file.
+    logger.get_data_from_serial_port(port, baud)
     # logger.get_data_from_file()
     
     while True:
@@ -358,7 +461,20 @@ def main():
             threading.Thread(target=play_sound, args=(sentence,)).start()
             time.sleep(1)
 
+def test():
+    frame = bytearray(b'\x55\x55\x41\x32\x1E\x00\x51\xFF\xC9\xFF\x67\x00\x00\x00\x00\x00\x00\xFF\xEB\xFF\xEC\xF3\x3D\x1D\x70\x1D\x70\x1D\x70\x00\x06\x5A\x54\x00\x00\x6D\xC9\x55\x55\x41\x32\x1E\x00\x51\xFF\xC9\xFF\x67\xFF\xFE\x00\x00\x00\x01\xFF\xEB\xFF\xEC\xF3\x3E\x1D\x70\x1D\x70\x1D\x70\x00\x06\x5A\x5E\x00\x00\x31\x33')
+    logger = IMULogger()
+    logger.handle_packet_A2(frame)
+
+def crc_test():
+    logger = IMULogger()
+    frame = bytearray(b'\x50\x52\x00')
+    crc = logger.calc_crc(frame)
+    print(hex(crc))
+    # SOFTWARE_RESET: [0X55,0X55,0X53,0X52,0X00,0X7E,0X4F]
+    # PROGRAM_RESET : [0X55,0X55,0X50,0X52,0X00,0X27,0X1F]
+
 
 if __name__ == '__main__':
     main()
-    
+
