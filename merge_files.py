@@ -59,6 +59,7 @@ def merge(sn_folder):
     print('Start logging:{0}'.format(log_file_name))
     log_file = open(log_file_name, 'w')
 
+    header_num = 8
     for file in files:
         with open(file, 'r') as f:
             idx = 0
@@ -67,7 +68,7 @@ def merge(sn_folder):
             while line:
                 try:
                     idx += 1
-                    if idx < 8: # skip header
+                    if idx < header_num: # skip header
                         line = f.readline()
                         continue                    
 
