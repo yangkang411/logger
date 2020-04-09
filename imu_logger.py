@@ -41,19 +41,30 @@ class IMULogger:
         self.data_lock = threading.Lock()  # lock of data_queue
         self.first_line = True
         self.packet_type = None
+        self.data_file = None
         self.log_file = None
         self.lines = 0
         self.b_send_reset_cmd = False
+        self.port = None
+        self.sn = None
+        self.version = None
         self.start_time = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
         print('IMU driver start at:{0}'.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+        # # create log file.
+        # self.port = self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200
+        # file_dir = os.path.join('data', self.start_time+'_' + self.port + '.log')
+        # self.log_file = open(file_dir, 'w')
+
 
     def reinit(self):
         ''' re-init parameters when occur SerialException.
         '''
         # DO NOT send reset cmmond when re-init logger.
         self.cmt.close()
-        if not self.data_queue.empty():
+        self.data_lock.acquire()
+        while not self.data_queue.empty():
             self.data_queue.get()
+        self.data_lock.release()
         self.exit_thread = False
         self.threads = []  # clear threads
 
@@ -124,15 +135,19 @@ class IMULogger:
                     elif 2 + 2 + 1 + payload_len + 2 == len(frame):  # 2: len of header 'UU'; 2: package type 'a1'; 1: payload len; 2:len of checksum.
                         find_header = False
                         # checksum
-                        packet_crc = 256 * frame[-2] + frame[-1]    
+                        packet_crc = 256 * frame[-2] + frame[-1]
                         if packet_crc == self.calc_crc(frame[PACKAGE_TYPE_IDX : -2]):
                             # find a whole frame
                             self.parse_frame(frame)
-                            if self.b_send_reset_cmd:
-                                self.b_send_reset_cmd = False
-                                cmd = [0X55,0X55,0X53,0X52,0X00,0X7E,0X4F] # SOFTWARE_RESET
-                                # cmd = [0X55,0X55,0X50,0X52,0X00,0X27,0X1F] # PROGRAM_RESET
-                                self.write(cmd)
+
+                            # # Reset IMU to start logging from 1st packet.
+                            # 1. For MTLT, it just repond SR msg, but not reset indeed, so user should as fllows to log from 1st packet:
+                            #   a. run imu_logger.py and recognize serial port at first.
+                            #   b. power on MTLT.
+                            # 2. For other devices, they can respond SR and actually reset, so, no matter run imu_logger.py or power on device firstly, user can get and log from the 1st packet.
+                            if self.b_send_reset_cmd: 
+                                self.send_packet_reset() # just send reset command once.
+                                self.send_packet_GP() # just send reset command once.
 
                         else:
                             print("CRC error!")
@@ -225,10 +240,18 @@ class IMULogger:
         PACKET_TYPE_IDX = 2
         tp = '{0}{1}'.format(chr(frame[PACKET_TYPE_IDX]) ,chr(frame[PACKET_TYPE_IDX+1]))
         if self.packet_type != tp:
-            print("PACKET TYPE: {0}".format(self.packet_type))
             self.packet_type = tp
+            tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
+            print("[{0}]: PACKET TYPE: {1}".format(tm_ms, self.packet_type))
 
-        if self.packet_type == 'a1':
+        if self.packet_type == 'ID':
+            self.handle_packet_ID(frame)
+        elif self.packet_type == 'PK':
+            self.handle_packet_PK(frame)
+        elif self.packet_type == 'SR' or \
+            self.packet_type == 'AR':
+            self.handle_packet_RST(frame)
+        elif self.packet_type == 'a1':
             self.handle_packet_a1(frame, False)
         elif self.packet_type == 'a2':
             pass
@@ -257,6 +280,94 @@ class IMULogger:
         crc = crc & 0xffff
         return crc
 
+    def send_packet_reset(self):
+        '''
+        Set reset command to device.
+
+        For MTLT:
+        1. PROGRAM_RESET CAN let MTLT work in while(1).
+        2. SOFTWARE_RESET is useless for MTLT.
+        3. Only 'Algorithm Reset Command' can make MTLT to reset.
+
+        For Other Device:
+        1. SOFTWARE_RESET cmd is work.
+        2. Not support 'Algorithm Reset Command'.
+        '''
+        software_rst_cmd = [0X55,0X55,0X53,0X52,0X00,0X7E,0X4F] # SOFTWARE_RESET
+        algo_rst_cmd = [0X55,0X55,0X41,0X52,0X00,0X53,0X4C] # Algorithm Reset Command OF MTLT 
+        program_rst_cmd = [0X55,0X55,0X50,0X52,0X00,0X27,0X1F] # PROGRAM_RESET
+
+        self.write(software_rst_cmd)
+        self.b_send_reset_cmd = False
+
+        # if 'MTLT' in self.version: # 
+        #     self.write(algo_rst_cmd)
+        #     pass
+        # else:
+        #     self.write(software_rst_cmd)
+
+    def send_packet_GP(self):
+        '''
+        Request SN and Model, eg. "1808541032" and "MTLT305D-400 5020-1382-01 19.1.6"
+        IMU will response 'ID' packet when receive 'GP' packet.
+        '''
+        cmd = [0X55,0X55,0X47,0X50,0X02,0X49,0X44,0X23,0X3d] # Get Packet Request
+        self.write(cmd)
+        pass
+    
+    def handle_packet_PK(self, frame):
+        '''
+        Response 'PK' packet.
+        '''
+        print("Receive Response of 'PK'")
+        pass
+
+    def handle_packet_RST(self, frame):
+        '''
+        Response 'SR' and 'AR' packet.
+        '''
+        # # empty data_queue.
+        # self.data_lock.acquire()
+        # while not self.data_queue.empty():
+        #     self.data_queue.get()
+        # self.data_lock.release()
+
+        if self.packet_type is 'SR':
+            print("Receive Response of 'SR'")
+        elif self.packet_type is 'AR':
+            print("Receive Response of 'AR'")
+        # self.b_send_reset_cmd = False
+
+    def handle_packet_ID(self, frame):
+        '''
+        Handle 'ID' packet which contain SN and Model, eg. "1808541032" and "MTLT305D-400 5020-1382-01 19.1.6"
+        '''
+        # # empty data_queue.
+        # self.data_lock.acquire()
+        # while not self.data_queue.empty():
+        #     self.data_queue.get()
+        # self.data_lock.release()
+
+        PAYLOAD_IDX = 5
+        PAYLOAD_LEN = frame[4]
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
+
+        pack_fmt = '>I{0}s'.format(PAYLOAD_LEN - 4) # PAYLOAD_LEN - sizeof(U4)
+        len_fmt = '{0}B'.format(PAYLOAD_LEN)
+        payload = frame[PAYLOAD_IDX : -2]
+
+        b = struct.pack(len_fmt, *payload)
+        d = struct.unpack(pack_fmt, b)
+        self.sn = d[0]
+        self.version = d[1].decode().replace('\x00','') # delete \x00 
+        str = "[{0}]: {1}, Device info, SN: {2}, Version: {3}".format(tm_ms, self.port, self.sn, self.version)
+        print(str)
+        sys.stdout.flush()
+
+        # log
+        # self.log_file.write(str + '\n')
+        pass
+
     def handle_packet_a1(self, frame, save_as_sim_fmt = False):
         '''
         Parse 'a1' packet.
@@ -278,9 +389,9 @@ class IMULogger:
             }angle1_payload_t;
         '''
         PAYLOAD_IDX = 5
-        PAYLOAD_LEN = 47
-        tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
-
+        PAYLOAD_LEN = frame[4] #47
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S_%f')[:-3]
+        
         pack_fmt = '<Id8f3B'
         len_fmt = '{0}B'.format(PAYLOAD_LEN)
         payload = frame[PAYLOAD_IDX : -2]
@@ -289,17 +400,18 @@ class IMULogger:
             self.first_line = False
             if not os.path.exists('data/'):
                 os.mkdir('data/')
-            file_dir = os.path.join('data', self.packet_type+'_'+ self.start_time+'.csv')
+            self.port = self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200     
+            file_dir = os.path.join('data', self.packet_type+'_' + self.start_time + '_' + self.port + '.csv')
             print('Start logging:{0}'.format(file_dir))
-            self.log_file = open(file_dir, 'w')
+            self.data_file = open(file_dir, 'w')
 
             if not save_as_sim_fmt: # save log as 'a1' packet
                 header = 'pc_tm, itow, dblItow, roll, pitch,       \
                         gyro_x, gyro_y, gyro_z,             \
                         acc_x, acc_y, acc_z,                \
                         ekfOpMode, accelLinSwitch, turnSwitch'.replace(' ', '')
-                self.log_file.write(header + '\n')
-                self.log_file.flush()
+                self.data_file.write(header + '\n')
+                self.data_file.flush()
 
         try:
             b = struct.pack(len_fmt, *payload)
@@ -321,12 +433,13 @@ class IMULogger:
                 .format(d[7]/GRAVITY, d[8]/GRAVITY, d[9]/GRAVITY, d[4], d[5], d[6], \
                         0, 0, 0, 0, 0, 0, 0, 0, d[2],d[3]).replace(' ', '')
 
-        self.log_file.write(str + '\n')
-        self.log_file.flush()
+        self.data_file.write(str + '\n')
+        self.data_file.flush()
         self.lines += 1
         if self.lines % 1000 == 0:
-            print("[{0}]:Log counter: {1}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.lines))
-
+            print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
+            sys.stdout.flush()
+            
     def handle_packet_A2(self, frame, save_as_sim_fmt = False):
         '''
         Parse 'A2' packet.
@@ -339,8 +452,8 @@ class IMULogger:
             
         '''
         PAYLOAD_IDX = 5
-        PAYLOAD_LEN = 30 # 0X1E
-        tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
+        PAYLOAD_LEN = frame[4] # 0X1E
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S_%f')[:-3]
 
         pack_fmt = '>12hIH' # Note: Big Endian!
         len_fmt = '{0}B'.format(PAYLOAD_LEN)
@@ -350,9 +463,10 @@ class IMULogger:
             self.first_line = False
             if not os.path.exists('data/'):
                 os.mkdir('data/')
-            file_dir = os.path.join('data', self.packet_type+'_'+ self.start_time+'.csv')
+            self.port = self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200     
+            file_dir = os.path.join('data', self.packet_type + '_' + self.start_time+'_' + self.port + '.csv')
             print('Start logging:{0}'.format(file_dir))
-            self.log_file = open(file_dir, 'w')
+            self.data_file = open(file_dir, 'w')
 
             if not save_as_sim_fmt: # save log as 'A2' packet
                 header = 'pc_tm, roll, pitch, yaw,       \
@@ -360,8 +474,8 @@ class IMULogger:
                         acc_x, acc_y, acc_z,             \
                         xRateTemp, yRateTemp, zRateTemp, \
                         timeITOW, BITstatus'.replace(' ', '')
-                self.log_file.write(header + '\n')
-                self.log_file.flush()
+                self.data_file.write(header + '\n')
+                self.data_file.flush()
 
         try:
             b = struct.pack(len_fmt, *payload)
@@ -392,7 +506,6 @@ class IMULogger:
         timeITOW  = d[12] # DMU ITOW in [ms]
         BITstatus = d[13] # Master BIT and Status
 
-
         if not save_as_sim_fmt: # Save log as 'A2' packet
             str = '{0},{1:f},{2:f},{3:f},{4:f},         \
                 {5:f},{6:f},{7:f},{8:f},{9:f},{10:f},   \
@@ -409,19 +522,19 @@ class IMULogger:
         #         .format(d[7]/GRAVITY, d[8]/GRAVITY, d[9]/GRAVITY, d[4], d[5], d[6], \
         #                 0, 0, 0, 0, 0, 0, 0, 0, d[2],d[3]).replace(' ', '')
 
-        self.log_file.write(str + '\n')
-        self.log_file.flush()
+        self.data_file.write(str + '\n')
+        self.data_file.flush()
         self.lines += 1
         if self.lines % 1000 == 0:
-            print("[{0}]:Log counter: {1}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.lines))
+            print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
+            sys.stdout.flush()
 
     def get_data_from_serial_port(self, port, baud):
         self.cmt = communicator.SerialPort()
         self.cmt.port = port
         self.cmt.baud = baud
 
-    def get_data_from_file(self):
-        data_file = '/Users/songyang/project/analyze/drive_test/2020-3-11/log/drive_short/300RI.bin'
+    def get_data_from_file(self, data_file):
         self.cmt = communicator.DataFile(data_file)
 
 
@@ -440,40 +553,31 @@ Please check below items:
 2. Config serial port and baud.
 3. 
 '''
-def main():
-    '''main'''
+def run(port, baud, b_rst = True):
+    '''wrapper'''
     logger = IMULogger()
-    logger.set_reset_flag(False) # True: reset IMU when receive the first packet.
-
-    # config serial port parameters.
-    port = '/dev/cu.usbserial'#'/dev/cu.usbserial-AH01EAT5'  
-    baud = 230400 # 57600 # 230400
+    logger.set_reset_flag(b_rst) # True: reset IMU when receive the first packet.
 
     # chose get data from serial or file.
     logger.get_data_from_serial_port(port, baud)
-    # logger.get_data_from_file()
+
+    # data_file = '/Users/songyang/project/analyze/drive_test/2020-3-11/log/drive_short/300RI.bin'
+    # logger.get_data_from_file(data_file)
     
     while True:
         logger.reinit()
         if logger.start_collection():
             print("retry start_collection ...")
+            sys.stdout.flush()
             sentence = "retry start_collection ..."
             threading.Thread(target=play_sound, args=(sentence,)).start()
             time.sleep(1)
 
-def test():
-    frame = bytearray(b'\x55\x55\x41\x32\x1E\x00\x51\xFF\xC9\xFF\x67\x00\x00\x00\x00\x00\x00\xFF\xEB\xFF\xEC\xF3\x3D\x1D\x70\x1D\x70\x1D\x70\x00\x06\x5A\x54\x00\x00\x6D\xC9\x55\x55\x41\x32\x1E\x00\x51\xFF\xC9\xFF\x67\xFF\xFE\x00\x00\x00\x01\xFF\xEB\xFF\xEC\xF3\x3E\x1D\x70\x1D\x70\x1D\x70\x00\x06\x5A\x5E\x00\x00\x31\x33')
-    logger = IMULogger()
-    logger.handle_packet_A2(frame)
-
-def crc_test():
-    logger = IMULogger()
-    frame = bytearray(b'\x50\x52\x00')
-    crc = logger.calc_crc(frame)
-    print(hex(crc))
-    # SOFTWARE_RESET: [0X55,0X55,0X53,0X52,0X00,0X7E,0X4F]
-    # PROGRAM_RESET : [0X55,0X55,0X50,0X52,0X00,0X27,0X1F]
-
+def main():
+    # config serial port parameters.
+    port = '/dev/cu.usbserial'#'/dev/cu.usbserial-AH01EAT5'  
+    baud = 230400 # 57600 # 230400
+    run(port, baud, False)
 
 if __name__ == '__main__':
     main()
