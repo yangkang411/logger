@@ -9,7 +9,7 @@ __pycache__/
 *.pyc
 
 # saved data files
-/data
+/data*
 
 # for mac
 .DS_Store
