@@ -59,6 +59,8 @@ def convret(tv_raw_data_file):
                     print(idx)
 
                 data = line.split('\t')
+                if len(data) < 10: # avoid parse the last line '16-bit CheckSum=35277'
+                    break
                 time = data[0] # time stamp
                 ax = float(data[3]) # mXAccel in [g]
                 ay = float(data[4]) # mYAccel in [g]
@@ -69,9 +71,14 @@ def convret(tv_raw_data_file):
                 roll = float(data[9]) # [deg]
                 pitch = float(data[10]) # [deg]
                 yaw = float(data[11]) # [deg]
-                mx = float(data[12]) # mXMag in [gauss]
-                my = float(data[13]) # mYMag in [gauss]
-                mz = float(data[14]) # mZMag in [gauss]
+                if data[12] == 'NaN': # Mag data is NaN in MTLT TV test.
+                    mx = 0
+                    my = 0
+                    mz = 0
+                else:
+                    mx = float(data[12]) # mXMag in [gauss]
+                    my = float(data[13]) # mYMag in [gauss]
+                    mz = float(data[14]) # mZMag in [gauss]
                 temp = float(data[18]) # mXRateSensTemp
 
                 s = '{0:f},{1:f},{2:f},{3:f},{4:f},{5:f},  \
@@ -89,6 +96,6 @@ def convret(tv_raw_data_file):
 
 
 if __name__ == '__main__':
-    tv_raw_data_file = r'/Users/songyang/project/analyze/factory/fail_analyze/test_report/2003012206/SN2003012206_MTLT305D-400_2020-03-26@12.03.34_Oven_Verify_Raw_B.txt'
+    tv_raw_data_file = sys.argv[1]
     convret(tv_raw_data_file)
 
