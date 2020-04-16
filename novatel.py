@@ -20,10 +20,8 @@ from tqdm import tqdm
 import gps
 
 
-def main():
+def main(novatel_ref):
     '''main'''
-    novatel_ref = r"/Users/songyang/project/analyze/drive_test/2020-3-16/novatel_ref/novatel_CPT7-2020_03_16_14_39_25.ASC"
-
     start_time = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     if not os.path.exists('data/'):
         os.mkdir('data/')
@@ -68,7 +66,7 @@ def main():
 
                 idx += 1
                 line = f.readline()
-                if idx % 1000 == 0:
+                if idx % 10000 == 0:
                     print("[{0}]:line: {1}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), idx))
 
             except Exception as e:
@@ -76,4 +74,4 @@ def main():
             
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1])
