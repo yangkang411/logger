@@ -261,6 +261,9 @@ class IMULogger:
             pass
         elif self.packet_type == 's2':
             pass
+        elif self.packet_type == 'A1': # OpenIMU335-VG
+            self.handle_packet_A1(frame)
+            pass
         elif self.packet_type == 'A2': # MTLT-305
             self.handle_packet_A2(frame)
             pass
@@ -439,7 +442,99 @@ class IMULogger:
         if self.lines % 1000 == 0:
             print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
             sys.stdout.flush()
-            
+
+    def handle_packet_A1(self, frame, save_as_sim_fmt = False):
+        '''
+        Parse 'A1' packet.
+        save_as_sim_fmt: 
+            False: Default, save log as 'A1' order.
+            True: Save log as sim format which can be used in dmu380_sim_src.
+                  [accel: g, gyro: deg/sec, mag: Gauss, AccTemp, RateTemp]
+
+            Please refer to page 67 of DMUX80ZA manual for A1 packet format.
+        '''
+        PAYLOAD_IDX = 5
+        PAYLOAD_LEN = frame[4] # 0X20
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S_%f')[:-3]
+
+        pack_fmt = '>13hIH' # Note: Big Endian!
+        len_fmt = '{0}B'.format(PAYLOAD_LEN)
+        payload = frame[PAYLOAD_IDX : -2]
+
+        if self.first_line:
+            self.first_line = False
+            if not os.path.exists('data/'):
+                os.mkdir('data/')
+            self.port = self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200     
+            file_dir = os.path.join('data', self.packet_type + '_' + self.start_time+'_' + self.port + '.csv')
+            print('Start logging:{0}'.format(file_dir))
+            self.data_file = open(file_dir, 'w')
+
+            if not save_as_sim_fmt: # save log as 'A1' packet
+                header = 'pc_tm, roll, pitch, yaw,       \
+                        gyro_x, gyro_y, gyro_z,          \
+                        acc_x, acc_y, acc_z,             \
+                        mag_x, mag_y, mag_z,             \
+                        xRateTemp,                       \
+                        timeITOW, BITstatus'.replace(' ', '')
+                self.data_file.write(header + '\n')
+                self.data_file.flush()
+
+        try:
+            b = struct.pack(len_fmt, *payload)
+            d = struct.unpack(pack_fmt, b)
+        except Exception as e:
+            print("Decode payload error: {0}".format(e)) 
+
+        s = 360/math.pow(2, 16) # [360°/2^16]
+        roll    = d[0] * s # roll  in [deg]
+        pitch   = d[1] * s # pitch in [deg]
+        yaw = d[2] * s # yaw   in [deg]
+
+        s = 1260/math.pow(2, 16) # [1260°/2^16]
+        gyro_x = d[3] * s # Corrected gyro_x in [deg/sec]
+        gyro_y = d[4] * s # Corrected gyro_y in [deg/sec]
+        gyro_z = d[5] * s # Corrected gyro_z in [deg/sec]
+
+        s = 20/math.pow(2, 16) # [20/2^16]
+        accel_x = d[6] * s # xAccel in [g]
+        accel_y = d[7] * s # yAccel in [g]
+        accel_z = d[8] * s # zAccel in [g]
+
+        s = 20/math.pow(2, 16) # [20/2^16]
+        mag_x = d[9] * s  # X magnetometer in [Gauss]
+        mag_y = d[10] * s  # X magnetometer in [Gauss]
+        mag_z = d[11] * s  # X magnetometer in [Gauss]
+
+        s = 200/math.pow(2, 16) # [200/2^16]
+        xRateTemp = d[12] * s  # xRateTemp in [C]
+        
+        timeITOW  = d[13] # DMU ITOW in [ms]
+        BITstatus = d[14] # Master BIT and Status
+
+        if not save_as_sim_fmt: # Save log as 'A2' packet
+            str = '{0},{1:f},{2:f},{3:f},{4:f},         \
+                {5:f},{6:f},{7:f},{8:f},{9:f},{10:f},   \
+                {11:f},{12:f},{13:f},{14:d},{15:d}'     \
+                .format(tm_ms, roll, pitch, yaw,        \
+                        gyro_x, gyro_y, gyro_z,         \
+                        accel_x, accel_y, accel_z,      \
+                        mag_x, mag_y, mag_z,            \
+                        xRateTemp, timeITOW, BITstatus).replace(' ', '')
+        # else:# Save log as sim format. Save 'roll' and 'pitch' in last two columns.
+        #     str = '{0:f},{1:f},{2:f},{3:f},{4:f},{5:f},     \
+        #            {6:f},{7:f},{8:f},{9:f},{10:f},{11:f},   \
+        #            {12:f},{13:f},{14:f},{15:f}'             \
+        #         .format(d[7]/GRAVITY, d[8]/GRAVITY, d[9]/GRAVITY, d[4], d[5], d[6], \
+        #                 0, 0, 0, 0, 0, 0, 0, 0, d[2],d[3]).replace(' ', '')
+
+        self.data_file.write(str + '\n')
+        self.data_file.flush()
+        self.lines += 1
+        if self.lines % 1000 == 0:
+            print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
+            sys.stdout.flush()
+
     def handle_packet_A2(self, frame, save_as_sim_fmt = False):
         '''
         Parse 'A2' packet.
@@ -576,7 +671,7 @@ def run(port, baud, b_rst = True):
 def main():
     # config serial port parameters.
     port = '/dev/cu.usbserial'#'/dev/cu.usbserial-AH01EAT5'  
-    baud = 230400 # 57600 # 230400
+    baud = 115200 # 57600 # 230400
     run(port, baud, False)
 
 if __name__ == '__main__':
