@@ -48,6 +48,7 @@ class IMULogger:
         self.port = None
         self.sn = None
         self.version = None
+        self.odr = 0
         self.start_time = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
         print('IMU driver start at:{0}'.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
         # # create log file.
@@ -67,6 +68,7 @@ class IMULogger:
         self.data_lock.release()
         self.exit_thread = False
         self.threads = []  # clear threads
+        self.odr = 0
 
     def receiver(self):
         ''' receive IMU data and push data into data_queue.
@@ -139,6 +141,7 @@ class IMULogger:
                         if packet_crc == self.calc_crc(frame[PACKAGE_TYPE_IDX : -2]):
                             # find a whole frame
                             self.parse_frame(frame)
+                            self.odr += 1
 
                             # # Reset IMU to start logging from 1st packet.
                             # 1. For MTLT, it just repond SR msg, but not reset indeed, so user should as fllows to log from 1st packet:
@@ -146,8 +149,8 @@ class IMULogger:
                             #   b. power on MTLT.
                             # 2. For other devices, they can respond SR and actually reset, so, no matter run imu_logger.py or power on device firstly, user can get and log from the 1st packet.
                             if self.b_send_reset_cmd: 
-                                self.send_packet_reset() # just send reset command once.
                                 self.send_packet_GP() # just send reset command once.
+                                self.send_packet_reset() # just send reset command once.
 
                         else:
                             print("CRC error!")
@@ -632,6 +635,13 @@ class IMULogger:
     def get_data_from_file(self, data_file):
         self.cmt = communicator.DataFile(data_file)
 
+    def print_realtime_odr(self, inc = 1):
+        _time = datetime.datetime.now().strftime("%H:%M:%S.%f")
+        print('[{0}]: ODR {1}'.format(_time, self.odr))
+        t = threading.Timer(inc, self.print_realtime_odr, (inc,))
+        t.start()
+        self.odr = 0
+
 
 def play_sound(sentence):
     '''
@@ -652,13 +662,16 @@ def run(port, baud, b_rst = True):
     '''wrapper'''
     logger = IMULogger()
     logger.set_reset_flag(b_rst) # True: reset IMU when receive the first packet.
-
+ 
     # chose get data from serial or file.
     logger.get_data_from_serial_port(port, baud)
 
     # data_file = '/Users/songyang/project/analyze/drive_test/2020-3-11/log/drive_short/300RI.bin'
     # logger.get_data_from_file(data_file)
     
+    # # check realtime ODF
+    # logger.print_realtime_odr()
+
     while True:
         logger.reinit()
         if logger.start_collection():
@@ -670,8 +683,8 @@ def run(port, baud, b_rst = True):
 
 def main():
     # config serial port parameters.
-    port = '/dev/cu.usbserial'#'/dev/cu.usbserial-AH01EAT5'  
-    baud = 115200 # 57600 # 230400
+    port = '/dev/cu.usbserial-FTCC03Q1'
+    baud = 230400
     run(port, baud, False)
 
 if __name__ == '__main__':
