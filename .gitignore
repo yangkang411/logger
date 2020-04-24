@@ -11,8 +11,11 @@ __pycache__/
 # saved data files
 /data*
 
+.idea
+
 # for mac
 .DS_Store
 
 test.py
+
 note.txt
