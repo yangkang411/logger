@@ -39,6 +39,7 @@ class IMULogger:
         self.exit_lock = threading.Lock()  # lock of exit_thread
         self.data_queue = Queue()  # data container
         self.data_lock = threading.Lock()  # lock of data_queue
+        self.apps = []
         self.first_line = True
         self.packet_type = None
         self.data_file = None
@@ -56,7 +57,6 @@ class IMULogger:
         # file_dir = os.path.join('data', self.start_time+'_' + self.port + '.log')
         # self.log_file = open(file_dir, 'w')
 
-
     def reinit(self):
         ''' re-init parameters when occur SerialException.
         '''
@@ -69,6 +69,13 @@ class IMULogger:
         self.exit_thread = False
         self.threads = []  # clear threads
         self.odr = 0
+
+    def add_app(self, app):
+        if app is not None:
+            self.apps.append(app)
+
+    def clean_apps(self):
+        self.apps = []
 
     def receiver(self):
         ''' receive IMU data and push data into data_queue.
@@ -143,13 +150,15 @@ class IMULogger:
                             self.parse_frame(frame)
                             self.odr += 1
 
+                            if self.sn is None:
+                                self.send_packet_GP() # send 'GP' command if hasn't got sn info.
+
                             # # Reset IMU to start logging from 1st packet.
                             # 1. For MTLT, it just repond SR msg, but not reset indeed, so user should as fllows to log from 1st packet:
                             #   a. run imu_logger.py and recognize serial port at first.
                             #   b. power on MTLT.
                             # 2. For other devices, they can respond SR and actually reset, so, no matter run imu_logger.py or power on device firstly, user can get and log from the 1st packet.
                             if self.b_send_reset_cmd: 
-                                self.send_packet_GP() # just send reset command once.
                                 self.send_packet_reset() # just send reset command once.
 
                         else:
@@ -442,11 +451,36 @@ class IMULogger:
         self.data_file.write(str + '\n')
         self.data_file.flush()
         self.lines += 1
+
+        if len(self.apps) != 0 and self.sn is not None:
+            data = collections.OrderedDict()
+            data['pc_tm']   = tm_ms
+            data['itow']    = int(d[0])
+            data['dblItow'] = float(d[1])
+            data['roll']    = float(d[2])
+            data['pitch']   = float(d[3])
+            data['gyro_x']  = float(d[4])
+            data['gyro_y']  = float(d[5])
+            data['gyro_z']  = float(d[6])
+            data['acc_x']   = float(d[7])
+            data['acc_y']   = float(d[8])
+            data['acc_z']   = float(d[9])
+            data['ekfOpMode'] = int(d[10])
+            data['accelLinSwitch'] = int(d[11])
+            data['turnSwitch'] = int(d[12])
+            msg = {}
+            msg['sn'] = self.sn
+            msg['version'] = self.version
+            msg['type'] = 'a1'
+            msg['data'] = data
+            for app in self.apps:
+                app.on_message(msg)
+
         if self.lines % 1000 == 0:
             print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
             sys.stdout.flush()
 
-    def handle_packet_A1(self, frame, save_as_sim_fmt = False):
+    def handle_packet_A1(self, frame):
         '''
         Parse 'A1' packet.
         save_as_sim_fmt: 
@@ -473,15 +507,14 @@ class IMULogger:
             print('Start logging:{0}'.format(file_dir))
             self.data_file = open(file_dir, 'w')
 
-            if not save_as_sim_fmt: # save log as 'A1' packet
-                header = 'pc_tm, roll, pitch, yaw,       \
-                        gyro_x, gyro_y, gyro_z,          \
-                        acc_x, acc_y, acc_z,             \
-                        mag_x, mag_y, mag_z,             \
-                        xRateTemp,                       \
-                        timeITOW, BITstatus'.replace(' ', '')
-                self.data_file.write(header + '\n')
-                self.data_file.flush()
+            header = 'pc_tm, roll, pitch, yaw,       \
+                    gyro_x, gyro_y, gyro_z,          \
+                    acc_x, acc_y, acc_z,             \
+                    mag_x, mag_y, mag_z,             \
+                    xRateTemp,                       \
+                    timeITOW, BITstatus'.replace(' ', '')
+            self.data_file.write(header + '\n')
+            self.data_file.flush()
 
         try:
             b = struct.pack(len_fmt, *payload)
@@ -515,25 +548,46 @@ class IMULogger:
         timeITOW  = d[13] # DMU ITOW in [ms]
         BITstatus = d[14] # Master BIT and Status
 
-        if not save_as_sim_fmt: # Save log as 'A2' packet
-            str = '{0},{1:f},{2:f},{3:f},{4:f},         \
-                {5:f},{6:f},{7:f},{8:f},{9:f},{10:f},   \
-                {11:f},{12:f},{13:f},{14:d},{15:d}'     \
-                .format(tm_ms, roll, pitch, yaw,        \
-                        gyro_x, gyro_y, gyro_z,         \
-                        accel_x, accel_y, accel_z,      \
-                        mag_x, mag_y, mag_z,            \
-                        xRateTemp, timeITOW, BITstatus).replace(' ', '')
-        # else:# Save log as sim format. Save 'roll' and 'pitch' in last two columns.
-        #     str = '{0:f},{1:f},{2:f},{3:f},{4:f},{5:f},     \
-        #            {6:f},{7:f},{8:f},{9:f},{10:f},{11:f},   \
-        #            {12:f},{13:f},{14:f},{15:f}'             \
-        #         .format(d[7]/GRAVITY, d[8]/GRAVITY, d[9]/GRAVITY, d[4], d[5], d[6], \
-        #                 0, 0, 0, 0, 0, 0, 0, 0, d[2],d[3]).replace(' ', '')
+        str = '{0},{1:f},{2:f},{3:f},{4:f},         \
+            {5:f},{6:f},{7:f},{8:f},{9:f},{10:f},   \
+            {11:f},{12:f},{13:f},{14:d},{15:d}'     \
+            .format(tm_ms, roll, pitch, yaw,        \
+                    gyro_x, gyro_y, gyro_z,         \
+                    accel_x, accel_y, accel_z,      \
+                    mag_x, mag_y, mag_z,            \
+                    xRateTemp, timeITOW, BITstatus).replace(' ', '')
 
         self.data_file.write(str + '\n')
         self.data_file.flush()
         self.lines += 1
+
+        # haven't test below code snippet
+        if len(self.apps) != 0 and self.sn is not None:
+            data = collections.OrderedDict()
+            data['pc_tm']   = tm_ms
+            data['roll']    = roll
+            data['pitch']   = pitch
+            data['yaw']   = yaw
+            data['gyro_x']  = gyro_x
+            data['gyro_y']  = gyro_y
+            data['gyro_z']  = gyro_z
+            data['acc_x']   = accel_x
+            data['acc_y']   = accel_y
+            data['acc_z']   = accel_z
+            data['mag_x']   = mag_x
+            data['mag_y']   = mag_y
+            data['mag_z']   = mag_z
+            data['xRateTemp'] = xRateTemp
+            data['timeITOW'] = timeITOW
+            data['BITstatus'] = BITstatus
+            msg = {}
+            msg['sn'] = self.sn
+            msg['version'] = self.version
+            msg['type'] = 'A1'
+            msg['data'] = data
+            for app in self.apps:
+                app.on_message(msg)
+
         if self.lines % 1000 == 0:
             print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
             sys.stdout.flush()
@@ -566,14 +620,13 @@ class IMULogger:
             print('Start logging:{0}'.format(file_dir))
             self.data_file = open(file_dir, 'w')
 
-            if not save_as_sim_fmt: # save log as 'A2' packet
-                header = 'pc_tm, roll, pitch, yaw,       \
-                        gyro_x, gyro_y, gyro_z,          \
-                        acc_x, acc_y, acc_z,             \
-                        xRateTemp, yRateTemp, zRateTemp, \
-                        timeITOW, BITstatus'.replace(' ', '')
-                self.data_file.write(header + '\n')
-                self.data_file.flush()
+            header = 'pc_tm, roll, pitch, yaw,       \
+                    gyro_x, gyro_y, gyro_z,          \
+                    acc_x, acc_y, acc_z,             \
+                    xRateTemp, yRateTemp, zRateTemp, \
+                    timeITOW, BITstatus'.replace(' ', '')
+            self.data_file.write(header + '\n')
+            self.data_file.flush()
 
         try:
             b = struct.pack(len_fmt, *payload)
@@ -604,25 +657,45 @@ class IMULogger:
         timeITOW  = d[12] # DMU ITOW in [ms]
         BITstatus = d[13] # Master BIT and Status
 
-        if not save_as_sim_fmt: # Save log as 'A2' packet
-            str = '{0},{1:f},{2:f},{3:f},{4:f},         \
-                {5:f},{6:f},{7:f},{8:f},{9:f},{10:f},   \
-                {11:f},{12:f},{13:d},{14:d}'            \
-                .format(tm_ms, roll, pitch, yaw,        \
-                        gyro_x, gyro_y, gyro_z,         \
-                        accel_x, accel_y, accel_z,      \
-                        xRateTemp, yRateTemp, zRateTemp,\
-                        timeITOW, BITstatus).replace(' ', '')
-        # else:# Save log as sim format. Save 'roll' and 'pitch' in last two columns.
-        #     str = '{0:f},{1:f},{2:f},{3:f},{4:f},{5:f},     \
-        #            {6:f},{7:f},{8:f},{9:f},{10:f},{11:f},   \
-        #            {12:f},{13:f},{14:f},{15:f}'             \
-        #         .format(d[7]/GRAVITY, d[8]/GRAVITY, d[9]/GRAVITY, d[4], d[5], d[6], \
-        #                 0, 0, 0, 0, 0, 0, 0, 0, d[2],d[3]).replace(' ', '')
+        str = '{0},{1:f},{2:f},{3:f},{4:f},         \
+            {5:f},{6:f},{7:f},{8:f},{9:f},{10:f},   \
+            {11:f},{12:f},{13:d},{14:d}'            \
+            .format(tm_ms, roll, pitch, yaw,        \
+                    gyro_x, gyro_y, gyro_z,         \
+                    accel_x, accel_y, accel_z,      \
+                    xRateTemp, yRateTemp, zRateTemp,\
+                    timeITOW, BITstatus).replace(' ', '')
 
         self.data_file.write(str + '\n')
         self.data_file.flush()
         self.lines += 1
+
+        # haven't test below code snippet
+        if len(self.apps) != 0 and self.sn is not None:
+            data = collections.OrderedDict()
+            data['pc_tm']   = tm_ms
+            data['roll']    = roll
+            data['pitch']   = pitch
+            data['yaw']   = yaw
+            data['gyro_x']  = gyro_x
+            data['gyro_y']  = gyro_y
+            data['gyro_z']  = gyro_z
+            data['acc_x']   = accel_x
+            data['acc_y']   = accel_y
+            data['acc_z']   = accel_z
+            data['xRateTemp'] = xRateTemp
+            data['yRateTemp'] = yRateTemp
+            data['zRateTemp'] = zRateTemp
+            data['timeITOW'] = timeITOW
+            data['BITstatus'] = BITstatus
+            msg = {}
+            msg['sn'] = self.sn
+            msg['version'] = self.version
+            msg['type'] = 'A2'
+            msg['data'] = data
+            for app in self.apps:
+                app.on_message(msg)
+
         if self.lines % 1000 == 0:
             print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
             sys.stdout.flush()
@@ -637,11 +710,11 @@ class IMULogger:
 
     def print_realtime_odr(self, inc = 1):
         _time = datetime.datetime.now().strftime("%H:%M:%S.%f")
+        # print('[{0}]: ODR {1}, {2}'.format(_time, self.odr, self.data_queue.qsize()))
         print('[{0}]: ODR {1}'.format(_time, self.odr))
         t = threading.Timer(inc, self.print_realtime_odr, (inc,))
         t.start()
         self.odr = 0
-
 
 def play_sound(sentence):
     '''
@@ -658,9 +731,14 @@ Please check below items:
 2. Config serial port and baud.
 3. 
 '''
-def run(port, baud, b_rst = True):
+def run(port, baud, b_rst = False, apps = None):
     '''wrapper'''
     logger = IMULogger()
+
+    if apps is not None:
+        for app in apps:
+            logger.add_app(app)
+
     logger.set_reset_flag(b_rst) # True: reset IMU when receive the first packet.
  
     # chose get data from serial or file.
@@ -684,8 +762,9 @@ def run(port, baud, b_rst = True):
 def main():
     # config serial port parameters.
     port = '/dev/cu.usbserial-FTCC03Q1'
-    baud = 230400
-    run(port, baud, False)
+    baud = 115200
+    run(port, baud, False, None)
+
 
 if __name__ == '__main__':
     main()
