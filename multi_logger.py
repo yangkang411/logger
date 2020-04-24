@@ -17,16 +17,16 @@ def main():
     threads = []
 
     # # for Mac
-    # _args = [                                       \
-    #         ('/dev/cu.usbserial-A403ELTH', 57600),   \
-    #         ('/dev/cu.usbserial-A6004WKM', 57600),   \
-    #         ]
+    _args = [                                                      \
+            ('/dev/cu.usbserial-FTCC03Q1', 115200, False, None),   \
+            ('/dev/cu.usbserial', 115200, False, None),            \
+            ]
 
     # # for PI
-    _args = [
-                ('/dev/ttyUSB0', 115200),    \
-                ('/dev/ttyUSB1', 115200),    \
-            ]
+    # _args = [
+    #             ('/dev/ttyUSB0', 115200, False, None),    \
+    #             ('/dev/ttyUSB1', 115200, False, None),    \
+    #         ]
 
     for arg in _args:
         t = threading.Thread(target=imu_logger.run, args=arg)
