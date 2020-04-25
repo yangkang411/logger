@@ -339,7 +339,7 @@ class DataFile(Communicator):
     
     def read(self,size):
         '''
-        read size bytes via TCPIP. 
+        read size bytes in file. 
         parameters: size – number of bytes to read.
         returns: bytes read from the port.
         return type: bytes
@@ -347,10 +347,6 @@ class DataFile(Communicator):
         try:
             data = self.file.read(size)
             return data
-            # if(len(data) != 0):
-            #     return data
-            # else: # notice 'receiver' thread to exit.
-            #     raise Exception("Finish reading data file.")
         except Exception as e:
             print(e)
             raise

@@ -15,7 +15,7 @@ def main():
     timer.timeout.connect(painter.draw)
     timer.start(100)
 
-    # user has to configurate '_args' to specific which devices' need to be shown in graph.
+    # user has to configurate '_args' to specific which devices' data need to be shown in graph.
     _args = [
             ('/dev/cu.usbserial-FTCC03Q1', 115200, False, (painter,)),
             ('/dev/cu.usbserial', 115200, False, (painter,))

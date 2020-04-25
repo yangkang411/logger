@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*
 """
+Get UTC time according to given GPS week and seconds.
 ref: https://github.com/Aceinna/span_decoder/blob/master/span_decoder.cpp
 Created on 2020-3-17
 @author: Ocean
