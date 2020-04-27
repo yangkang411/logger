@@ -150,8 +150,8 @@ class IMULogger:
                             self.parse_frame(frame)
                             self.odr += 1
 
-                            if self.sn is None:
-                                self.send_packet_GP() # send 'GP' command if hasn't got sn info.
+                            # if self.sn is None:
+                            #     self.send_packet_GP() # send 'GP' command if hasn't got sn info.
 
                             # # Reset IMU to start logging from 1st packet.
                             # 1. For MTLT, it just repond SR msg, but not reset indeed, so user should as fllows to log from 1st packet:
@@ -268,7 +268,7 @@ class IMULogger:
         elif self.packet_type == 'a2':
             pass
         elif self.packet_type == 'z1':
-            pass
+            self.handle_packet_z1(frame)
         elif self.packet_type == 's1':
             pass
         elif self.packet_type == 's2':
@@ -475,6 +475,59 @@ class IMULogger:
             msg['data'] = data
             for app in self.apps:
                 app.on_message(msg)
+
+        if self.lines % 1000 == 0:
+            print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
+            sys.stdout.flush()
+
+    def handle_packet_z1(self, frame):
+        '''
+        Parse 'z1' packet.
+            typedef struct {
+                uint32_t timer;
+                float    accel_mpss[3];
+                float    rate_dps[3];
+                float    mag_G[3];
+            }data1_payload_t;
+        '''
+        PAYLOAD_IDX = 5
+        PAYLOAD_LEN = frame[4] # 40
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S_%f')[:-3]
+        
+        pack_fmt = '<I9f'
+        len_fmt = '{0}B'.format(PAYLOAD_LEN)
+        payload = frame[PAYLOAD_IDX : -2]
+
+        if self.first_line:
+            self.first_line = False
+            if not os.path.exists('data/'):
+                os.mkdir('data/')
+            self.port = '' #self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200     
+            file_dir = os.path.join('data', self.packet_type+'_' + self.start_time + '_' + self.port + '.csv')
+            print('Start logging:{0}'.format(file_dir))
+            self.data_file = open(file_dir, 'w')
+
+            header = 'pc_tm, itow,                             \
+                    accel_mpss_x, accel_mpss_y, accel_mpss_z,  \
+                    rate_dps_x, rate_dps_y, rate_dps_z,        \
+                    mag_G_x, mag_G_y, mag_G_z'.replace(' ', '')
+            self.data_file.write(header + '\n')
+            self.data_file.flush()
+
+        try:
+            b = struct.pack(len_fmt, *payload)
+            d = struct.unpack(pack_fmt, b)
+        except Exception as e:
+            print("Decode payload error: {0}".format(e)) 
+
+        str = '{0},{1:d},{2:f},{3:f},{4:f},         \
+            {5:f},{6:f},{7:f},{8:f},{9:f},{10:f}'   \
+            .format(tm_ms,d[0],d[1],d[2],d[3],      \
+                d[4],d[5],d[6],d[7],d[8],d[9]).replace(' ', '')
+
+        self.data_file.write(str + '\n')
+        self.data_file.flush()
+        self.lines += 1
 
         if self.lines % 1000 == 0:
             print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
@@ -724,6 +777,19 @@ def play_sound(sentence):
     cmd = "say '{0}'".format(sentence)
     os.system(cmd)
 
+def parse_bin_file(data_file):
+    '''wrapper'''
+    logger = IMULogger()
+    logger.get_data_from_file(data_file)
+    
+    while True:
+        logger.reinit()
+        if logger.start_collection():
+            print("retry start_collection ...")
+            sys.stdout.flush()
+            sentence = "retry start_collection ..."
+            threading.Thread(target=play_sound, args=(sentence,)).start()
+            time.sleep(1)
 
 '''
 Please check below items:
@@ -767,5 +833,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
-
+    # main()
+    data_file = '/Users/songyang/Desktop/20200425135413.imu'
+    parse_bin_file(data_file)
