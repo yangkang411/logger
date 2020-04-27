@@ -150,8 +150,9 @@ class IMULogger:
                             self.parse_frame(frame)
                             self.odr += 1
 
-                            # if self.sn is None:
-                            #     self.send_packet_GP() # send 'GP' command if hasn't got sn info.
+                            # query sn if .cmt is not 'communicator.DataFile'
+                            if self.sn is None and not isinstance(self.cmt, communicator.DataFile):
+                                self.send_packet_GP() # send 'GP' command if hasn't got sn info.
 
                             # # Reset IMU to start logging from 1st packet.
                             # 1. For MTLT, it just repond SR msg, but not reset indeed, so user should as fllows to log from 1st packet:
@@ -383,14 +384,9 @@ class IMULogger:
         # self.log_file.write(str + '\n')
         pass
 
-    def handle_packet_a1(self, frame, save_as_sim_fmt = False):
+    def handle_packet_a1(self, frame):
         '''
         Parse 'a1' packet.
-        save_as_sim_fmt: 
-            False: Default, save log as 'a1' order.
-            True: Save log as sim format which can be used in dmu380_sim_src.
-                  [accel: g, gyro: deg/sec, mag: Gauss, AccTemp, RateTemp]
-
             typedef struct {
                 uint32_t itow;          // msec
                 double   dblItow;       // s
@@ -420,13 +416,12 @@ class IMULogger:
             print('Start logging:{0}'.format(file_dir))
             self.data_file = open(file_dir, 'w')
 
-            if not save_as_sim_fmt: # save log as 'a1' packet
-                header = 'pc_tm, itow, dblItow, roll, pitch,       \
-                        gyro_x, gyro_y, gyro_z,             \
-                        acc_x, acc_y, acc_z,                \
-                        ekfOpMode, accelLinSwitch, turnSwitch'.replace(' ', '')
-                self.data_file.write(header + '\n')
-                self.data_file.flush()
+            header = 'pc_tm, itow, dblItow, roll, pitch,       \
+                    gyro_x, gyro_y, gyro_z,             \
+                    acc_x, acc_y, acc_z,                \
+                    ekfOpMode, accelLinSwitch, turnSwitch'.replace(' ', '')
+            self.data_file.write(header + '\n')
+            self.data_file.flush()
 
         try:
             b = struct.pack(len_fmt, *payload)
@@ -434,19 +429,12 @@ class IMULogger:
         except Exception as e:
             print("Decode payload error: {0}".format(e)) 
 
-        if not save_as_sim_fmt: # Save log as 'a1' packet
-            str = '{0},{1:d},{2:f},{3:f},{4:f},         \
-                {5:f},{6:f},{7:f},{8:f},{9:f},{10:f},   \
-                {11:d},{12:d},{13:d}'                   \
-                .format(tm_ms,d[0],d[1],d[2],d[3],      \
-                    d[4],d[5],d[6],d[7],d[8],d[9],      \
-                    d[10],d[11],d[12]).replace(' ', '')
-        else:# Save log as sim format. Save 'roll' and 'pitch' in last two columns.
-            str = '{0:f},{1:f},{2:f},{3:f},{4:f},{5:f},     \
-                   {6:f},{7:f},{8:f},{9:f},{10:f},{11:f},   \
-                   {12:f},{13:f},{14:f},{15:f}'             \
-                .format(d[7]/GRAVITY, d[8]/GRAVITY, d[9]/GRAVITY, d[4], d[5], d[6], \
-                        0, 0, 0, 0, 0, 0, 0, 0, d[2],d[3]).replace(' ', '')
+        str = '{0},{1:d},{2:f},{3:f},{4:f},         \
+            {5:f},{6:f},{7:f},{8:f},{9:f},{10:f},   \
+            {11:d},{12:d},{13:d}'                   \
+            .format(tm_ms,d[0],d[1],d[2],d[3],      \
+                d[4],d[5],d[6],d[7],d[8],d[9],      \
+                d[10],d[11],d[12]).replace(' ', '')
 
         self.data_file.write(str + '\n')
         self.data_file.flush()
@@ -502,7 +490,7 @@ class IMULogger:
             self.first_line = False
             if not os.path.exists('data/'):
                 os.mkdir('data/')
-            self.port = '' #self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200     
+            self.port = self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200     
             file_dir = os.path.join('data', self.packet_type+'_' + self.start_time + '_' + self.port + '.csv')
             print('Start logging:{0}'.format(file_dir))
             self.data_file = open(file_dir, 'w')
@@ -536,12 +524,7 @@ class IMULogger:
     def handle_packet_A1(self, frame):
         '''
         Parse 'A1' packet.
-        save_as_sim_fmt: 
-            False: Default, save log as 'A1' order.
-            True: Save log as sim format which can be used in dmu380_sim_src.
-                  [accel: g, gyro: deg/sec, mag: Gauss, AccTemp, RateTemp]
-
-            Please refer to page 67 of DMUX80ZA manual for A1 packet format.
+        Please refer to page 67 of DMUX80ZA manual for A1 packet format.
         '''
         PAYLOAD_IDX = 5
         PAYLOAD_LEN = frame[4] # 0X20
@@ -645,16 +628,10 @@ class IMULogger:
             print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
             sys.stdout.flush()
 
-    def handle_packet_A2(self, frame, save_as_sim_fmt = False):
+    def handle_packet_A2(self, frame):
         '''
         Parse 'A2' packet.
-        save_as_sim_fmt: 
-            False: Default, save log as 'A2' order.
-            True: Save log as sim format which can be used in dmu380_sim_src.
-                  [accel: g, gyro: deg/sec, mag: Gauss, AccTemp, RateTemp]
-
-            Please refer to page 37 of MTLT305D manual for A2 packet format.
-            
+        Please refer to page 37 of MTLT305D manual for A2 packet format.
         '''
         PAYLOAD_IDX = 5
         PAYLOAD_LEN = frame[4] # 0X1E
@@ -831,8 +808,8 @@ def main():
     baud = 115200
     run(port, baud, False, None)
 
+    # data_file = '/Users/songyang/Desktop/20200425135413.imu'
+    # parse_bin_file(data_file)
 
 if __name__ == '__main__':
-    # main()
-    data_file = '/Users/songyang/Desktop/20200425135413.imu'
-    parse_bin_file(data_file)
+    main()
