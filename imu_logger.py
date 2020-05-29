@@ -730,6 +730,68 @@ class IMULogger:
             print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
             sys.stdout.flush()
 
+    def handle_packet_e2(self, frame):
+        '''
+        Parse 'e2' packet.
+
+        '''
+        PAYLOAD_IDX = 5
+        PAYLOAD_LEN = frame[4] # 0X1E
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S_%f')[:-3]
+
+        pack_fmt = '>12hIH' # Note: Big Endian!
+        len_fmt = '{0}B'.format(PAYLOAD_LEN)
+        payload = frame[PAYLOAD_IDX : -2]
+
+        if self.first_line:
+            self.first_line = False
+            if not os.path.exists('data/'):
+                os.mkdir('data/')
+            self.port = self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200     
+            file_dir = os.path.join('data', self.packet_type + '_' + self.start_time+'_' + self.port + '.csv')
+            print('Start logging:{0}'.format(file_dir))
+            self.data_file = open(file_dir, 'w')
+
+            header = 'pc_tm, roll, pitch, yaw,       \
+                    gyro_x, gyro_y, gyro_z,          \
+                    acc_x, acc_y, acc_z,             \
+                    xRateTemp, yRateTemp, zRateTemp, \
+                    timeITOW, BITstatus'.replace(' ', '')
+            self.data_file.write(header + '\n')
+            self.data_file.flush()
+
+        try:
+            b = struct.pack(len_fmt, *payload)
+            d = struct.unpack(pack_fmt, b)
+        except Exception as e:
+            print("Decode payload error: {0}".format(e)) 
+
+        s = 360/math.pow(2, 16) # [360°/2^16]
+        roll    = d[0] * s # roll  in [deg]
+        pitch   = d[1] * s # pitch in [deg]
+        yaw = d[2] * s # yaw   in [deg]
+
+        s = 1260/math.pow(2, 16) # [1260°/2^16]
+        gyro_x = d[3] * s # Corrected gyro_x in [deg/sec]
+        gyro_y = d[4] * s # Corrected gyro_y in [deg/sec]
+        gyro_z = d[5] * s # Corrected gyro_z in [deg/sec]
+
+        s = 20/math.pow(2, 16) # [20/2^16]
+        accel_x = d[6] * s # xAccel in [g]
+        accel_y = d[7] * s # yAccel in [g]
+        accel_z = d[8] * s # zAccel in [g]
+
+        s = 200/math.pow(2, 16) # [200/2^16]
+        xRateTemp = d[9] * s  # xRateTemp in [C]
+        yRateTemp = d[10] * s # yRateTemp in [C]
+        zRateTemp = d[11] * s # zRateTemp in [C]
+        
+        timeITOW  = d[12] # DMU ITOW in [ms]
+        BITstatus = d[13] # Master BIT and Status
+
+
+
+
     def get_data_from_serial_port(self, port, baud):
         self.cmt = communicator.SerialPort()
         self.cmt.port = port
