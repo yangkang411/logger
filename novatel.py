@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*
 """
-Parse Novatel ASCII log, and save [time,lla, roll, pitch] to csv log.
+Parse Novatel ASCII log, and save [time,lla, velocity, roll, pitch] to csv log.
 Created on 2020-3-12
 @author: Ocean
 """
@@ -20,8 +20,10 @@ from tqdm import tqdm
 import gps
 
 
-def main(novatel_ref):
-    '''main'''
+def parse_novatel_ASC_log(novatel_ref):
+    '''
+    Parse Novatel ASCII log, and save [time,lla, velocity, roll, pitch] to csv log.
+    '''
     start_time = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     if not os.path.exists('data/'):
         os.mkdir('data/')
@@ -76,6 +78,57 @@ def main(novatel_ref):
             except Exception as e:
                 print('Error at line {0} :{1}'.format(idx,e))
             
+def generate_vel_sim(file):
+    '''
+    Extract velocity info and generate velocity data for simulation.
+    '''
+    start_time = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    if not os.path.exists('data/'):
+        os.mkdir('data/')
+    file_dir = os.path.join('data', 'novatel_'+ start_time+'_velocity_sim'+'.csv')
+    print('Start: {0}'.format(file_dir))
+    ref_file = open(file_dir, 'w')
+    header = 'odoUpdate,odoVelocity'
+    ref_file.write(header + '\n')
+    ref_file.flush()
+
+    with open(file, 'r', encoding='utf-8') as f:
+        idx = 1
+        line = f.readline()
+        while line:
+            try:
+                if idx == 1: # ignore the 1st line header 
+                    idx += 1
+                    line = f.readline()
+                    continue
+
+                item = line.split(',')
+                vel_norm = float(item[9])
+                str = '1,{0:f}\n'.format(vel_norm)
+                ref_file.write(str)
+                ref_file.flush()
+
+                # expand velocity from 10Hz to 100/200 Hz, 
+                for i in range(20-1):   # 100Hz: 10-1;   200Hz: 20-1
+                    str = '0,0\n'
+                    ref_file.write(str)
+                ref_file.flush()
+                
+                idx += 1
+                line = f.readline()
+                if idx % 10000 == 0:
+                    print("[{0}]:line: {1}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), idx))
+
+            except Exception as e:
+                print('Error at line {0} :{1}'.format(idx,e))
+    pass
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    parse_novatel_ASC_log(sys.argv[1])
+    # generate_vel_sim(sys.argv[1])
+
+    # f = '/Users/songyang/project/analyze/drive_test/2020-4-21/novatel_ref/novatel_CPT7-2020_04_21_15_20_37.ASC'
+    # parse_novatel_ASC_log(f)
+
+    # f = '/Users/songyang/project/code/github/logger/data/novatel_20200617_152310.csv'
+    # generate_vel_sim(f)
