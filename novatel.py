@@ -28,7 +28,7 @@ def main(novatel_ref):
     file_dir = os.path.join('data', 'novatel_'+ start_time+'.csv')
     print('Start: {0}'.format(file_dir))
     ref_file = open(file_dir, 'w')
-    header = 'Time,GPS_week,time(sec),lat(deg),lon(deg),alt(m),roll(deg),pitch(deg),yaw(deg)'
+    header = 'Time,GPS_week,time(sec),lat(deg),lon(deg),alt(m),vel_N(m/s),vel_E(m/s),vel_U(m/s),vel_norm(m/s),roll(deg),pitch(deg),yaw(deg)'
     ref_file.write(header + '\n')
     ref_file.flush()
 
@@ -42,20 +42,24 @@ def main(novatel_ref):
                     GPS_week = item[5]
                     GPS_second = item[6]
                     latitude = item[11] # deg
-                    longitude = item[12] # deg
+                    longitude = item[12]# deg
                     altitude = item[13] # m
-                    roll = item[18]  # deg
-                    pitch = item[19] # deg
-                    yaw = item[20] # deg
+                    vel_N = float(item[15])     # North velocity (m/s)     NEU is left-handed coordinates!
+                    vel_E = float(item[16])    # East velocity (m/s)
+                    vel_U = float(item[17])    # Up velocity (m/s)
+                    vel_norm = math.sqrt(vel_N * vel_N + vel_E * vel_E + vel_U * vel_U)
+                    roll = item[18]     # deg
+                    pitch = item[19]    # deg
+                    yaw = item[20]      # deg
 
                     time_gps = gps.gpst2time(int(GPS_week), float(GPS_second))
                     time_utc = gps.gpst2utc(time_gps)
                     time = gps.time2epoch(time_utc)
                     time_stamp = time.strftime("%Y-%m-%d_%H:%M:%S.%f")[:-3]
 
-                    str = '{0},{1},{2},{3},{4},{5},{6},{7},{8}\n'.  \
-                        format(time_stamp, GPS_week, GPS_second,    \
-                            latitude,longitude,altitude,roll,pitch,yaw)
+                    str = '{0},{1},{2},{3},{4},{5},{6:f},{7:f},{8:f},{9:f},{10},{11},{12}\n'.  \
+                        format(time_stamp, GPS_week, GPS_second, latitude,longitude,altitude,   \
+                               vel_N,vel_E,vel_U,vel_norm,roll,pitch,yaw)
 
                     ref_file.write(str)
                     ref_file.flush()
