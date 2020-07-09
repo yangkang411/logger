@@ -278,7 +278,10 @@ class IMULogger:
             self.handle_packet_A1(frame)
             pass
         elif self.packet_type == 'A2': # MTLT-305
-            self.handle_packet_A2(frame)
+            self.handle_packet_A2_and_A3(frame, 'A2')
+            pass
+        elif self.packet_type == 'A3': # MTLT-305
+            self.handle_packet_A2_and_A3(frame, 'A3')
             pass
 
     def calc_crc(self,payload):
@@ -628,9 +631,11 @@ class IMULogger:
             print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
             sys.stdout.flush()
 
-    def handle_packet_A2(self, frame):
+    def handle_packet_A2_and_A3(self, frame, pack_tp):
         '''
-        Parse 'A2' packet.
+        Parse 'A2' or ‘A3’ packet.
+        There are 3D corrected rate in 'A2' and raw rate in ‘A3’.
+        Other fields are totally the same between 'A2' and ‘A3’ packet.
         Please refer to page 37 of MTLT305D manual for A2 packet format.
         '''
         PAYLOAD_IDX = 5
@@ -721,7 +726,7 @@ class IMULogger:
             msg = {}
             msg['sn'] = self.sn
             msg['version'] = self.version
-            msg['type'] = 'A2'
+            msg['type'] = pack_tp
             msg['data'] = data
             for app in self.apps:
                 app.on_message(msg)
