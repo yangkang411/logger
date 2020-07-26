@@ -272,6 +272,9 @@ class IMULogger:
             self.handle_packet_z1(frame)
         elif self.packet_type == 's1':
             pass
+        elif self.packet_type == 'S1':
+            self.handle_packet_S1(frame)
+            pass
         elif self.packet_type == 's2':
             pass
         elif self.packet_type == 'A1': # OpenIMU335-VG
@@ -623,6 +626,101 @@ class IMULogger:
             msg['sn'] = self.sn
             msg['version'] = self.version
             msg['type'] = 'A1'
+            msg['data'] = data
+            for app in self.apps:
+                app.on_message(msg)
+
+        if self.lines % 1000 == 0:
+            print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
+            sys.stdout.flush()
+
+    def handle_packet_S1(self, frame):
+        '''
+        Parse 'S1' packet.
+        '''
+        PAYLOAD_IDX = 5
+        PAYLOAD_LEN = frame[4] # 0X20
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S_%f')[:-3]
+
+        pack_fmt = '>10h2H' # Note: Big Endian!
+        len_fmt = '{0}B'.format(PAYLOAD_LEN)
+        payload = frame[PAYLOAD_IDX : -2]
+
+        if self.first_line:
+            self.first_line = False
+            if not os.path.exists('data/'):
+                os.mkdir('data/')
+            self.port = self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200     
+            file_dir = os.path.join('data', self.packet_type + '_' + self.start_time+'_' + self.port + '.csv')
+            print('Start logging:{0}'.format(file_dir))
+            self.data_file = open(file_dir, 'w')
+
+            header = 'pc_tm,                                    \
+                    acc_x, acc_y, acc_z,                        \
+                    gyro_x, gyro_y, gyro_z,                     \
+                    xRateTemp, yRateTemp, zRateTemp, boardTemp, \
+                    Counter, BITstatus'.replace(' ', '')
+            self.data_file.write(header + '\n')
+            self.data_file.flush()
+
+        try:
+            b = struct.pack(len_fmt, *payload)
+            d = struct.unpack(pack_fmt, b)
+        except Exception as e:
+            print("Decode payload error: {0}".format(e)) 
+
+        s = 20/math.pow(2, 16) # [20/2^16]
+        accel_x = d[0] * s # xAccel in [g]
+        accel_y = d[1] * s # yAccel in [g]
+        accel_z = d[2] * s # zAccel in [g]
+
+        s = 1260/math.pow(2, 16) # [1260°/2^16]
+        gyro_x = d[3] * s # Corrected gyro_x in [deg/sec]
+        gyro_y = d[4] * s # Corrected gyro_y in [deg/sec]
+        gyro_z = d[5] * s # Corrected gyro_z in [deg/sec]
+
+        s = 200/math.pow(2, 16) # [200/2^16]
+        xRateTemp = d[6] * s  # xRateTemp in [C]
+        yRateTemp = d[7] * s  # xRateTemp in [C]
+        zRateTemp = d[8] * s  # xRateTemp in [C]
+        boardTemp = d[9] * s  # xRateTemp in [C]
+        
+        Counter  = d[10]  # Output packet counter [ms]
+        BITstatus = d[11] # Master BIT and Status
+
+        str = '{0},{1:f},{2:f},{3:f},{4:f},         \
+            {5:f},{6:f},{7:f},{8:f},{9:f},{10:f},   \
+            {11:d},{12:d}'                          \
+            .format(tm_ms,                          \
+                    accel_x, accel_y, accel_z,      \
+                    gyro_x, gyro_y, gyro_z,         \
+                    xRateTemp, yRateTemp, zRateTemp, boardTemp,           \
+                    Counter, BITstatus).replace(' ', '')
+
+        self.data_file.write(str + '\n')
+        self.data_file.flush()
+        self.lines += 1
+
+        # haven't test below code snippet
+        if len(self.apps) != 0 and self.sn is not None:
+            data = collections.OrderedDict()
+            data['pc_tm']   = tm_ms
+            data['acc_x']   = accel_x
+            data['acc_y']   = accel_y
+            data['acc_z']   = accel_z
+            data['gyro_x']  = gyro_x
+            data['gyro_y']  = gyro_y
+            data['gyro_z']  = gyro_z
+            data['xRateTemp'] = xRateTemp
+            data['yRateTemp'] = yRateTemp
+            data['zRateTemp'] = zRateTemp
+            data['boardTemp'] = boardTemp
+            data['Counter']   = Counter
+            data['BITstatus'] = BITstatus
+            msg = {}
+            msg['sn'] = self.sn
+            msg['version'] = self.version
+            msg['type'] = 'S1'
             msg['data'] = data
             for app in self.apps:
                 app.on_message(msg)
