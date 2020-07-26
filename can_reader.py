@@ -44,8 +44,9 @@ class CanReader():
         self.PGN = None
         self.PGN = None
 
-        self.reader_factory()
-        self.create_log_files ()
+        if file_name is not None:
+            self.reader_factory()
+            self.create_log_files ()
         pass
     
     def reader_factory(self):
@@ -125,22 +126,22 @@ class CanReader():
         str = '{0:f},{1},{2},'.format(msg.timestamp, hex(msg.arbitration_id), self.PGN)
 
         if self.PGN == PGN.SSI2.value:    # Slope Sensor Information 2
-            data = self.parse_tilt(msg)
+            data = self.parse_tilt(msg.data)
             str += ','.join('{0:f}'.format(i) for i in data) + '\n'
             self.log_file_tilt.write(str )
             self.log_file_tilt.flush()
         elif self.PGN == PGN.ARI.value:   # Angular Rate
-            data = self.parse_gyro(msg)
+            data = self.parse_gyro(msg.data)
             str += ','.join('{0:f}'.format(i) for i in data) + '\n'
             self.log_file_gyro.write(str )
             self.log_file_gyro.flush()
         elif self.PGN == PGN.ACCS.value:  # Acceleration Sensor
-            data = self.parse_accel(msg)
+            data = self.parse_accel(msg.data)
             str += ','.join('{0:f}'.format(i) for i in data) + '\n'
             self.log_file_accel.write(str )
             self.log_file_accel.flush()
         elif self.PGN == PGN.CCVS1.value: # Cruise Control/Vehicle Speed 1
-            data = self.parse_velocity(msg)
+            data = self.parse_velocity(msg.data)
             str += ','.join('{0:f}'.format(i) for i in data) + '\n'
             self.log_file_vel.write(str )
             self.log_file_vel.flush()
@@ -159,9 +160,9 @@ class CanReader():
         in: CAN msg
         out: tuple, (gyro_x, gyro_y, gyro_z) in [deg/s]
         '''
-        wx_uint = msg.data[0] + 256 * msg.data[1] 
-        wy_uint = msg.data[2] + 256 * msg.data[3] 
-        wz_uint =  msg.data[4] + 256 * msg.data[5] 
+        wx_uint = msg[0] + 256 * msg[1] 
+        wy_uint = msg[2] + 256 * msg[3] 
+        wz_uint =  msg[4] + 256 * msg[5] 
         wx = wx_uint * (1/128.0) - 250.0
         wy = wy_uint * (1/128.0) - 250.0
         wz = wz_uint * (1/128.0) - 250.0
@@ -175,9 +176,9 @@ class CanReader():
         in: CAN msg
         out: tuple, (accel_x, accel_y, accel_z) in [m/s²]
         '''
-        ax_uint = msg.data[0] + 256 * msg.data[1] 
-        ay_uint = msg.data[2] + 256 * msg.data[3] 
-        az_uint =  msg.data[4] + 256 * msg.data[5] 
+        ax_uint = msg[0] + 256 * msg[1] 
+        ay_uint = msg[2] + 256 * msg[3] 
+        az_uint =  msg[4] + 256 * msg[5] 
         ax = ax_uint * (0.01) - 320.0
         ay = ay_uint * (0.01) - 320.0
         az = az_uint * (0.01) - 320.0
@@ -191,8 +192,8 @@ class CanReader():
         in: CAN msg
         out: tuple, (roll, pitch) in [deg]
         '''
-        pitch_uint = msg.data[0] + 256 * msg.data[1] +  65536 * msg.data[2]
-        roll_uint = msg.data[3] + 256 * msg.data[4] +  65536 * msg.data[5]
+        pitch_uint = msg[0] + 256 * msg[1] +  65536 * msg[2]
+        roll_uint = msg[3] + 256 * msg[4] +  65536 * msg[5]
         pitch = pitch_uint * (1/32768) - 250.0
         roll = roll_uint * (1/32768) - 250.0
         # print('Roll: {0:3.2f} Pitch: {1:3.2f}'.format(roll,pitch))
@@ -205,7 +206,7 @@ class CanReader():
         in: CAN msg
         out: Wheel-Based Vehicle Speed in [km/h]
         '''
-        vel_unint = msg.data[1] + 256 * msg.data[2] 
+        vel_unint = msg[1] + 256 * msg[2] 
         vel_km_perhr = vel_unint * (1/256.0)
         vel_m_persec = vel_km_perhr / 3.6
         # print('{0:3.2f}'.format(vel_km_perhr))
@@ -215,7 +216,8 @@ class CanReader():
 if __name__ == '__main__':
     # file_name = sys.argv[1]
     # file_name = '/Users/songyang/project/analyze/drive_test/JD/2020-6-4/data/PitchAndRollLog_EngineRunning_Full 6-03-2020 3-39-21 pm Messages File.asc'
-    file_name = '/Users/songyang/project/analyze/drive_test/CNH/blf/C9-MY134_OBW1_B009_2020-05-22_15-47-02_25200kg_MS1_rural_motorway__begins_with_strong_uphill.blf'
+    # file_name = '/Users/songyang/project/analyze/drive_test/CNH/2020-7-3/data/CNGRSW02_22-06-2020_Full_load_Mixed_mission_a_Slope_sensor_from1500s_to2....blf'
+    file_name = '/Users/songyang/project/analyze/drive_test/CNH/2020-7-16/data/CNGRSW02_13_07_2020_intermediate_load_Slope_sensor_10ms_Highway_1.blf'
     can_reader = CanReader(file_name)
 
     try:
