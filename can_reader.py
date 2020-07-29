@@ -10,9 +10,17 @@ ref:
 https://python-can.readthedocs.io/en/master/_modules/can/io/asc.html
 https://python-can.readthedocs.io/en/master/_modules/can/io/blf.html
 https://www.javaroad.cn/questions/25895
+
+There are 2 ways to install python-can:
+1. pip install python-can
+2. Installing python-can in development mode:
+    git clone https://github.com/hardbyte/python-can.git
+    cd python-can
+    python3 setup.py develop
 """
 
 import os
+import sys
 from enum import Enum
 import datetime
 from can.io.blf import BLFReader
