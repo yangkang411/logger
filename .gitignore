@@ -16,6 +16,4 @@ __pycache__/
 # for mac
 .DS_Store
 
-test.py
-
 note.txt
