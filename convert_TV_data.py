@@ -43,6 +43,10 @@ def convret(tv_raw_data_file):
     print('Start logging:{0}'.format(log_file_name))
     log_file = open(log_file_name, 'w')
 
+    # write header.
+    s = 'acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z,mag_x,mag_y,mag_z,roll[deg],pitch[deg],yaw[deg],Temp'
+    log_file.write(s + '\n')
+
     header_num = 35
     with open(tv_raw_data_file, 'r') as f:
         idx = 0
@@ -96,7 +100,7 @@ def convret(tv_raw_data_file):
 
 
 if __name__ == '__main__':
-    tv_raw_data_file = sys.argv[1]
+    # tv_raw_data_file = sys.argv[1]
     convret(tv_raw_data_file)
 
-# '/Volumes/productionbackup/dmudata/dmu305/19XXXXXXXX/1903046146'
+# '/Volumes/productionbackup/dmudata/dmu305/20XXXXXXXX/2003017287/SN2003017287_MTLT305E-400_2020-08-23@20.09.54_Oven_Verify_Raw_B.txt'
