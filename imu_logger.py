@@ -265,7 +265,7 @@ class IMULogger:
             self.packet_type == 'AR':
             self.handle_packet_RST(frame)
         elif self.packet_type == 'a1':
-            self.handle_packet_a1(frame, False)
+            self.handle_packet_a1(frame)
         elif self.packet_type == 'a2':
             pass
         elif self.packet_type == 'z1':
@@ -407,7 +407,7 @@ class IMULogger:
         '''
         PAYLOAD_IDX = 5
         PAYLOAD_LEN = frame[4] #47
-        tm_ms = datetime.datetime.now().strftime('%H:%M:%S_%f')[:-3]
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
         
         pack_fmt = '<Id8f3B'
         len_fmt = '{0}B'.format(PAYLOAD_LEN)
@@ -486,7 +486,7 @@ class IMULogger:
         '''
         PAYLOAD_IDX = 5
         PAYLOAD_LEN = frame[4] # 40
-        tm_ms = datetime.datetime.now().strftime('%H:%M:%S_%f')[:-3]
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
         
         pack_fmt = '<I9f'
         len_fmt = '{0}B'.format(PAYLOAD_LEN)
@@ -534,7 +534,7 @@ class IMULogger:
         '''
         PAYLOAD_IDX = 5
         PAYLOAD_LEN = frame[4] # 0X20
-        tm_ms = datetime.datetime.now().strftime('%H:%M:%S_%f')[:-3]
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
 
         pack_fmt = '>13hIH' # Note: Big Endian!
         len_fmt = '{0}B'.format(PAYLOAD_LEN)
@@ -640,7 +640,7 @@ class IMULogger:
         '''
         PAYLOAD_IDX = 5
         PAYLOAD_LEN = frame[4] # 0X20
-        tm_ms = datetime.datetime.now().strftime('%H:%M:%S_%f')[:-3]
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
 
         pack_fmt = '>10h2H' # Note: Big Endian!
         len_fmt = '{0}B'.format(PAYLOAD_LEN)
@@ -738,7 +738,7 @@ class IMULogger:
         '''
         PAYLOAD_IDX = 5
         PAYLOAD_LEN = frame[4] # 0X1E
-        tm_ms = datetime.datetime.now().strftime('%H:%M:%S_%f')[:-3]
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
 
         pack_fmt = '>12hIH' # Note: Big Endian!
         len_fmt = '{0}B'.format(PAYLOAD_LEN)
@@ -840,7 +840,7 @@ class IMULogger:
         '''
         PAYLOAD_IDX = 5
         PAYLOAD_LEN = frame[4] # 0X1E
-        tm_ms = datetime.datetime.now().strftime('%H:%M:%S_%f')[:-3]
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
 
         pack_fmt = '>12hIH' # Note: Big Endian!
         len_fmt = '{0}B'.format(PAYLOAD_LEN)
