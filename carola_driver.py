@@ -5,6 +5,7 @@ Requires PI2/3/4 and Waveshare Tech PiCAN board 'RS485 CAN HAT'
 '''
 
 import os
+import sys
 import math
 import time
 import datetime
@@ -25,14 +26,13 @@ class CarolaDriver:
         ## close can0
         os.system('sudo ifconfig can0 down')
         ## set bitrate of can0
-        os.system('sudo ip link set can0 type can bitrate 250000')
+        os.system('sudo ip link set can0 type can bitrate 500000')
         ## open can0
         os.system('sudo ifconfig can0 up')
         # os.system('sudo /sbin/ip link set can0 up type can bitrate 250000')
         ## show details can0 for debug.
         # os.system('sudo ip -details link show can0')
 
-        self.can_parser = CANParser()
         if 0:
             ## set up CAN Bus of J1939
             self.bus = j1939.Bus(channel='can0', bustype='socketcan_native')
@@ -44,6 +44,11 @@ class CarolaDriver:
             ## set up Notifier
             self.notifier = can.Notifier(self.can0, [self.msg_handler])
 
+        self.can_parser = CANParser()
+        self.create_log_files()
+        self.lines = 0
+        self.gear = 0
+
     def msg_handler(self,msg):
         return
 
@@ -53,8 +58,9 @@ class CarolaDriver:
         '''
         if msg.arbitration_id == 0XAA:
             self.cnt += 1
-            if self.cnt % 10 != 0:
-                return 
+            # if self.cnt % 10 != 0: # 100Hz -> 10Hz
+            #     return 
+
             # time = datetime.datetime.fromtimestamp(msg.timestamp)
             # print(time)
 
@@ -88,7 +94,7 @@ class CarolaDriver:
 
             m = can.Message(arbitration_id = id, data = data, extended_id = True)
             self.can0.send(m)
-            print(m)
+            # print(m)
 
             #### construct PGN-65265 id and data
             id = self.can_parser.generate_PDU(Priority = 6, PGN = 65265, SA = 0X88)
@@ -99,7 +105,23 @@ class CarolaDriver:
 
             m = can.Message(arbitration_id = id, data = data, extended_id = True)
             self.can0.send(m)
-            print(m)
+            # print(m)
+
+            ## save to log files.
+            s = datetime.datetime.now().strftime('%H:%M:%S.%f')
+            s += ',' + str(msg.arbitration_id)
+            s += ','.join('{0:f}'.format(i) for i in (speed_fr, speed_fl, speed_rr, speed_rl))
+            s += ',' + str(self.gear) + '\n'
+            self.log_file_vel.write(s)
+            self.log_file_vel.flush()
+            self.log_file_all.write(s)
+            self.log_file_all.flush()
+            
+            ##
+            self.lines += 1
+            if self.lines % 100 == 0:
+                print("[{0}]:Log counter of: {1}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.lines))
+                sys.stdout.flush()
 
     def convertGearMsg(self,msg):
         if msg.arbitration_id == 0X3BC:
@@ -110,6 +132,7 @@ class CarolaDriver:
             #    N      ->     0
             #    D      ->     1
             (gear,) = self.can_parser.parse_gear_carola(msg.data)
+            self.gear = gear
             offset = -125
             if gear == 32: # P
                 gear = 251
@@ -132,13 +155,54 @@ class CarolaDriver:
             id = self.can_parser.generate_PDU(Priority = 6, PGN = 61445, SA = 0X88)
             m = can.Message(arbitration_id = id, data = data, extended_id = True)
             self.can0.send(m)
-            print(m)
+            # print(m)
+            ## save to log files.
+            s = datetime.datetime.now().strftime('%H:%M:%S.%f')
+            s += ',' + str(msg.arbitration_id)
+            s += ',' + str(gear) + '\n'
+            self.log_file_gear.write(s)
+            self.log_file_gear.flush()
+            self.log_file_all.write(s)
+            self.log_file_all.flush()
 
     def handleSpeedMsg(self):
         self.notifier.listeners.append(self.convertSpeedMsg)
 
     def handleGearMsg(self):
         self.notifier.listeners.append(self.convertGearMsg)
+
+    def create_log_files (self):
+        '''
+        create log files.
+        '''
+        if not os.path.exists('data/'):
+            os.mkdir('data/')
+        start_time = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        file_dir        = os.path.join('data', start_time + '.csv')
+        file_dir_vel    = os.path.join('data', start_time + '_vel' + '.csv')
+        file_dir_gear   = os.path.join('data', start_time + '_gear' + '.csv')
+
+        self.log_file_all   = open(file_dir, 'w')
+        self.log_file_vel   = open(file_dir_vel, 'w')
+        self.log_file_gear  = open(file_dir_gear, 'w')
+
+        print('Start logging: {0}'.format(file_dir))
+        header = 'time, ID, payload'.replace(' ', '')
+        self.log_file_all.write(header + '\n')
+        self.log_file_all.flush()        
+        header = 'time, ID, speed_fr, speed_fl, speed_rr, speed_rl, gear'.replace(' ', '')
+        self.log_file_vel.write(header + '\n')
+        self.log_file_vel.flush()
+        header = 'time, ID, gear'.replace(' ', '')
+        self.log_file_gear.write(header + '\n')
+        self.log_file_gear.flush()
+        pass
+
+    def close_log_files (self):
+        self.log_file_all.close()
+        self.log_file_vel.close()
+        self.log_dir_gear.close()
 
 
 if __name__ == "__main__":
@@ -147,4 +211,4 @@ if __name__ == "__main__":
     drv.handleGearMsg()
 
     while 1:
-        pass
+        time.sleep(1)
