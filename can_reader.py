@@ -215,7 +215,7 @@ class CANTestLogReader():
         self.log_file_vel.close()
         self.log_dir_gear.close()
 
-    def Read(self,):
+    def read(self,):
         can_parser = CANParser()
         with open(self.file, 'r', encoding='utf-8') as f:
             idx = 0
@@ -246,7 +246,7 @@ class CANTestLogReader():
                     data = None
                     s = '{0},{1},{2},'.format(item[2],sys_time,id)
                     if id == 0XAA:  # 170
-                        data = can_parser.parse_wheel_speed(msg)
+                        data = can_parser.parse_wheel_speed_carola(msg)
                         s += ','.join('{0:f}'.format(i) for i in data)
                         s += ',' + str(self.gear) + '\n'
                         self.log_file_vel.write(s )
@@ -273,7 +273,7 @@ class CANTestLogReader():
                     print('Error at line {0} :{1}'.format(idx,e))
 
 
-def ReadFromBLFAndASC(file_name):
+def read_from_blf_and_asc(file_name):
     can_reader = CanReader(file_name)
     try:
         for item in can_reader.reader:
@@ -283,7 +283,7 @@ def ReadFromBLFAndASC(file_name):
     except Exception as e:
         print(e)
 
-def ReadFromCANTest(file_name):
+def read_from_CAN_test(file_name):
     '''
     Read from CANTest Log file.
         Index,Direction,Timesteamp,ID,Format,Type,Length,Data,
@@ -291,14 +291,14 @@ def ReadFromCANTest(file_name):
         495,Receive,15:57:04.044.0,0x000003bc,Standard,Data,0x08,00 20 00 00 00 00 00 00 ,
     '''
     can_reader = CANTestLogReader(file_name)
-    can_reader.Read()
+    can_reader.read()
     can_reader.close_log_files()
 
 if __name__ == '__main__':
     # file_name = sys.argv[1]
-    file_name = '/Users/songyang/project/analyze/drive_test/CNH/2020-11-4/data/20201029_EMC_test_sensata_eurocargo/Logging_3.blf'
-    ReadFromBLFAndASC(file_name)
+    # file_name = '/Users/songyang/project/analyze/drive_test/CNH/2020-11-4/data/20201029_EMC_test_sensata_eurocargo/Logging_3.blf'
+    # read_from_blf_and_asc(file_name)
 
     # Read and parse CAN-Test csv log.
-    # file_name = '/Users/songyang/project/code/github/logger/data/CAN-11-02/can_log.csv'
-    # ReadFromCANTest(file_name)
+    file_name = '/Users/songyang/project/code/github/logger/data/data_2020-11-30/Carola_CAN/2020-11-30/can_log.csv'
+    read_from_CAN_test(file_name)

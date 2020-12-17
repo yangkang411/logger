@@ -18,7 +18,7 @@ from can_parser import PGNType, CANParser
 
 class CarolaDriver:
     '''
-        Parse Carolar CAN message. 
+        Parse Carola CAN message. 
         Convert velocity and gear message to standard J1939 CAN message.
     '''
     def __init__(self):
@@ -48,11 +48,12 @@ class CarolaDriver:
         self.create_log_files()
         self.lines = 0
         self.gear = 0
+        self.last_speed = 0
 
     def msg_handler(self,msg):
         return
 
-    def convertSpeedMsg(self,msg):
+    def convert_speed_msg(self,msg):
         '''
             Convert 100Hz Carola speed message to 10Hz J1939 PGN odometer message.
         '''
@@ -65,9 +66,15 @@ class CarolaDriver:
             # print(time)
 
             # parse wheels speed from msg.
-            (speed_fr, speed_fl, speed_rr, speed_rl) = self.can_parser.parse_wheel_speed(msg.data)
+            (speed_fr, speed_fl, speed_rr, speed_rl) = self.can_parser.parse_wheel_speed_carola(msg.data)
             # print("speed:", speed_fr, speed_fl, speed_rr, speed_rl)
 
+            # Test
+            #if math.fabs(speed_fl - self.last_speed) > 1.0001:
+            #    print(speed_fl - self.last_speed)
+            #self.last_speed = speed_fl
+            #return
+            
             #### construct PGN-65215 id and data
             # SA CAN NOT be 0X80 which equal to MTLT's address.
             id = self.can_parser.generate_PDU(Priority = 6, PGN = 65215, SA = 0X88)
@@ -123,7 +130,7 @@ class CarolaDriver:
                 print("[{0}]:Log counter of: {1}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.lines))
                 sys.stdout.flush()
 
-    def convertGearMsg(self,msg):
+    def convert_gear_msg(self,msg):
         if msg.arbitration_id == 0X3BC:
             # parse carola gear from msg.
             # Carola    ->    PGN61445
@@ -165,11 +172,11 @@ class CarolaDriver:
             self.log_file_all.write(s)
             self.log_file_all.flush()
 
-    def handleSpeedMsg(self):
-        self.notifier.listeners.append(self.convertSpeedMsg)
+    def handle_speed_msg(self):
+        self.notifier.listeners.append(self.convert_speed_msg)
 
-    def handleGearMsg(self):
-        self.notifier.listeners.append(self.convertGearMsg)
+    def handle_gear_msg(self):
+        self.notifier.listeners.append(self.convert_gear_msg)
 
     def create_log_files (self):
         '''
@@ -207,8 +214,8 @@ class CarolaDriver:
 
 if __name__ == "__main__":
     drv = CarolaDriver()
-    drv.handleSpeedMsg()
-    drv.handleGearMsg()
+    drv.handle_speed_msg()
+    drv.handle_gear_msg()
 
     while 1:
         time.sleep(1)

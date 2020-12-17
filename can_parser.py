@@ -23,6 +23,10 @@ class PGNType(Enum):
     WSI        = 65215   # Wheel Speed Information   
     TACHOGRAPH = 65132   # Tachograph
 
+class CarolaCANID(Enum):
+    WS         = 0XAA   # Wheel speeds.
+    GEAR       = 0X3BC  # Gear message.
+
 
 class CANParser():
     def __init__(self):
@@ -171,7 +175,7 @@ class CANParser():
         tachograph_vehicle_speed = (msg[6] + msg[7] * 256) / 256
         return (direction_indicator,tachograph_vehicle_speed)
 
-    def parse_wheel_speed(self, msg):
+    def parse_wheel_speed_carola(self, msg):
         '''
         Parse WHEEL_SPEEDS info from Toyota Corolla.
         
@@ -209,6 +213,13 @@ class CANParser():
             BO_ 956 GEAR_PACKET: 8 XXX
             SG_ GEAR : 13|6@0+ (1,0) [0|63] "" XXX
             SG_ SPORT_ON : 3|1@0+ (1,0) [0|1] "" XXX
+
+        meaning:
+            Gear Value
+            P     32
+            R     16
+            N     8
+            D     0
         '''
         gear = msg[1]
         return (gear,)
