@@ -10,6 +10,7 @@ __pycache__/
 
 # saved data files
 /data*
+/bk*
 
 .idea
 
