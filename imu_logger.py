@@ -286,6 +286,9 @@ class IMULogger:
         elif self.packet_type == 'A3': # MTLT-305
             self.handle_packet_A2_and_A3(frame, 'A3')
             pass
+        elif self.packet_type == 'd1': # Odometer
+            self.handle_packet_d1(frame)
+            pass
 
     def calc_crc(self,payload):
         '''Calculates CRC per 380 manual
@@ -892,8 +895,63 @@ class IMULogger:
         timeITOW  = d[12] # DMU ITOW in [ms]
         BITstatus = d[13] # Master BIT and Status
 
+    def handle_packet_d1(self, frame):
+        '''
+        Parse 'd1' packet.
+            typedef struct {
+                uint32_t itow;          // msec
+                double   dblItow;       // s
+                float    roll;          // deg
+                float    pitch;         // deg
+                float    rates[3];      // deg/s
+                float    accels[3];     // "g"
+                float    v;             // m/s
+                BOOL     update;        // flag
+            }aid1_payload_t;
+        '''
+        PAYLOAD_IDX = 5
+        PAYLOAD_LEN = frame[4] #49
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
+        
+        pack_fmt = '<Id9fB'
+        len_fmt = '{0}B'.format(PAYLOAD_LEN)
+        payload = frame[PAYLOAD_IDX : -2]
 
+        if self.first_line:
+            self.first_line = False
+            if not os.path.exists('data/'):
+                os.mkdir('data/')
+            self.port = self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200     
+            file_dir = os.path.join('data', self.packet_type+'_' + self.start_time + '_' + self.port + '.csv')
+            print('Start logging:{0}'.format(file_dir))
+            self.data_file = open(file_dir, 'w')
 
+            header = 'pc_tm, itow, dblItow, roll, pitch,  \
+                    acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z, \
+                    v, update'.replace(' ', '')
+            self.data_file.write(header + '\n')
+            self.data_file.flush()
+
+        try:
+            b = struct.pack(len_fmt, *payload)
+            d = struct.unpack(pack_fmt, b)
+        except Exception as e:
+            print("Decode payload error: {0}".format(e)) 
+
+        str = '{0},{1:d},{2:f},{3:f},{4:f},         \
+            {5:f},{6:f},{7:f},{8:f},{9:f},{10:f},   \
+            {11:f},{12:d}'                   \
+            .format(tm_ms,d[0],d[1],d[2],d[3],      \
+                d[4],d[5],d[6],d[7],d[8],d[9],      \
+                d[10],d[11]).replace(' ', '')
+
+        self.data_file.write(str + '\n')
+        self.data_file.flush()
+        self.lines += 1
+
+        if self.lines % 1000 == 0:
+            print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
+            sys.stdout.flush()
 
     def get_data_from_serial_port(self, port, baud):
         self.cmt = communicator.SerialPort()
@@ -933,6 +991,57 @@ def parse_bin_file(data_file):
             threading.Thread(target=play_sound, args=(sentence,)).start()
             time.sleep(1)
 
+def auto_scan_devices():
+    '''
+    '''
+    logger = IMULogger()
+    logger.cmt = communicator.SerialPort()
+
+    HEADER = [0X55, 0X55, 0X49, 0X44] # 'ID'
+    PACKAGE_TYPE_IDX = 2
+    PAYLOAD_LEN_IDX = 4
+
+    sync_pattern = collections.deque(4*[0], 4)
+    find_header = False
+    frame = []
+    payload_len = 0
+
+    ports = logger.cmt.find_ports()
+
+    for port in ports:
+        for baud in [115200]:
+        # for baud in [115200, 230400, 57600]:
+            logger.cmt.open_serial_port(port, baud, 0.2)  # Assume driver can receive the respose of request 'GP' in 1 second.
+            if logger.cmt.ser:
+                logger.send_packet_GP()
+                serial_data = bytearray(logger.cmt.ser.read(1000))  # Assume driver can receive the respose of request 'GP' within 1000 bytes.
+                logger.cmt.ser.close()
+                sz = len(serial_data)
+                find_header = False
+                logger.port = port
+
+                for d in serial_data:
+                    if find_header:
+                        frame.append(d)
+                        if PAYLOAD_LEN_IDX + 1 == len(frame):
+                            payload_len = frame[PAYLOAD_LEN_IDX]
+                        elif 2 + 2 + 1 + payload_len + 2 == len(frame):  # 2: len of header 'UU'; 2: package type 'a1'; 1: payload len; 2:len of checksum.
+                            find_header = False
+                            # checksum
+                            packet_crc = 256 * frame[-2] + frame[-1]
+                            if packet_crc == logger.calc_crc(frame[PACKAGE_TYPE_IDX : -2]):
+                                # find a whole frame
+                                logger.parse_frame(frame)
+                                break
+                            else:
+                                print("CRC error!")
+                    else:
+                        sync_pattern.append(d)
+                        if operator.eq(list(sync_pattern), HEADER):
+                            frame = HEADER[:]
+                            find_header = True
+                            sync_pattern.append(0)
+
 '''
 Please check below items:
 1. Set SOFTWARE_RESET if desired. SOFTWARE_RESET is usless for MTLT305
@@ -968,13 +1077,20 @@ def run(port, baud, b_rst = False, apps = None):
             time.sleep(1)
 
 def main():
+    ### Log IMU data on one channel.
     # config serial port parameters.
-    port = '/dev/cu.usbserial-FTCC03Q1'
-    baud = 115200
+    port = '/dev/tty.usbserial'
+    baud = 230400
     run(port, baud, False, None)
 
-    # data_file = '/Users/songyang/Desktop/20200425135413.imu'
+    ### Log IMU data by binary data.
+    # data_file = '/Users/songyang/Desktop/335/2'
+    # data_file = '/Users/songyang/project/analyze/factory/2021-01-06/data/data2/D2/237'
     # parse_bin_file(data_file)
+
+    ### Auto scan all IMU device.
+    # auto_scan_devices()
+
 
 if __name__ == '__main__':
     main()
