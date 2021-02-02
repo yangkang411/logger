@@ -76,13 +76,13 @@ class CanSender:
 
                 if 0 == idx%10: # Sending gear msg at 10 Hz.
                     # Construct Gear CAN message.
-                    if 0 == t:
+                    if 0 == t%4:
                         gear_data[1] = 0   # Gear: D
-                    elif 1 == t:
+                    elif 1 == t%4:
                         gear_data[1] = 16  # Gear: R
-                    elif 2 == t:
+                    elif 2 == t%4:
                         gear_data[1] = 8   # Gear: N
-                    elif 3 == t:
+                    elif 3 == t%4:
                         gear_data[1] = 32  # Gear: P
                     else:
                         gear_data[1] = 0   # Gear: D
@@ -255,7 +255,7 @@ class CanSender:
 
 if __name__ == "__main__":
     drv = CanSender()
-    # drv.send_Carola_CAN_msg()
-    drv.send_pgn65215_msg()
+    drv.send_Carola_CAN_msg()
+    # drv.send_pgn65215_msg()
     # drv.send_pgn65265_msg()
 

@@ -41,6 +41,7 @@ def crc_test():
     logger = imu_logger.IMULogger()
     # frame = bytearray(b'\x50\x52\x00')
     frame = bytearray(b'\x57\x46\x05\x01\x00\x03\x41\x32')
+    frame = bytearray(b'\x57\x46\x05\x01\x00\x03\x64\x32')
     crc = logger.calc_crc(frame)
     print(hex(crc))
     # SOFTWARE_RESET: [0X55,0X55,0X53,0X52,0X00,0X7E,0X4F]
@@ -120,8 +121,9 @@ def parseCalibrationHexString():
 
 def main():
     '''main'''
+    crc_test()
 
-    splitLPFString()
+    # splitLPFString()
     return 
 
     parseCalibrationHexString()
