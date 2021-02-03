@@ -83,7 +83,7 @@ def configNovatel(ser):
     setupcommands7  = ['unlogall\r',\
                 'serialconfig com1 230400 N 8 1 N OFF\r',\
                 'ETHCONFIG ETHA AUTO AUTO AUTO AUTO\r',\
-                'NTRIPCONFIG ncom1 client v1 106.12.40.121:2201 RTK rtkdrive 555555\r',\
+                'NTRIPCONFIG ncom1 client v1 47.116.1.17:2201 WX02 rtkdrive 555555\r',\
                 'interfacemode ncom1 rtcmv3 novatel off\r',\
                 'interfacemode com1 novatel novatel on\r',\
                 'alignmentmode automatic\r',\

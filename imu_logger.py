@@ -927,7 +927,7 @@ class IMULogger:
             self.data_file = open(file_dir, 'w')
 
             header = 'pc_tm, itow, dblItow, roll, pitch,  \
-                    acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z, \
+                    gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z, \
                     v, update'.replace(' ', '')
             self.data_file.write(header + '\n')
             self.data_file.flush()
