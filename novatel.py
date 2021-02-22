@@ -5,18 +5,9 @@ Created on 2020-3-12
 @author: Ocean
 """
 
-import sys
 import os
-import threading
 import datetime
-import time
-import operator
-import struct
-import glob
 import math
-import json
-import collections
-from tqdm import tqdm
 import gps
 
 
@@ -128,7 +119,7 @@ if __name__ == '__main__':
     # parse_novatel_ASC_log(sys.argv[1])
     # generate_vel_sim(sys.argv[1])
 
-    f = '/Users/songyang/project/analyze/drive_test/2021-2-7/data/novatel_CPT7-2021_02_07_14_13_44.ASC'
+    f = '/Users/songyang/project/analyze/drive_test/2021-2-7/data/raw_data/novatel_CPT7-2021_02_07_14_13_44.ASC'
     parse_novatel_ASC_log(f)
 
     # f = '/Users/songyang/project/code/github/logger/data/novatel_20200617_152310.csv'
