@@ -420,7 +420,7 @@ class IMULogger:
             self.first_line = False
             if not os.path.exists('data/'):
                 os.mkdir('data/')
-            self.port = self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200     
+            self.port = self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200
             file_dir = os.path.join('data', self.packet_type+'_' + self.start_time + '_' + self.port + '.csv')
             print('Start logging:{0}'.format(file_dir))
             self.data_file = open(file_dir, 'w')
@@ -960,6 +960,7 @@ class IMULogger:
 
     def get_data_from_file(self, data_file):
         self.cmt = communicator.DataFile(data_file)
+        self.cmt.port = 'file'
 
     def print_realtime_odr(self, inc = 1):
         _time = datetime.datetime.now().strftime("%H:%M:%S.%f")
@@ -974,8 +975,9 @@ def play_sound(sentence):
     Only tested on MacOS.
     https://blog.csdn.net/weixin_41822224/article/details/100167499
     '''
-    cmd = "say '{0}'".format(sentence)
-    os.system(cmd)
+    if sys.platform.startswith('darwin'): # if Mac OS
+        cmd = "say '{0}'".format(sentence)
+        os.system(cmd)
 
 def parse_bin_file(data_file):
     '''wrapper'''
@@ -1078,15 +1080,14 @@ def run(port, baud, b_rst = False, apps = None):
 
 def main():
     ### Log IMU data on one channel.
-    # config serial port parameters.
-    port = '/dev/tty.usbserial'
-    baud = 230400
-    run(port, baud, False, None)
+    ## config serial port parameters.
+    # port = '/dev/tty.usbserial'
+    # baud = 230400
+    # run(port, baud, False, None)
 
     ### Log IMU data by binary data.
-    # data_file = '/Users/songyang/Desktop/335/2'
-    # data_file = '/Users/songyang/project/analyze/factory/2021-01-06/data/data2/D2/237'
-    # parse_bin_file(data_file)
+    data_file = '/Users/songyang/Desktop/Capture.txt'
+    parse_bin_file(data_file)
 
     ### Auto scan all IMU device.
     # auto_scan_devices()
