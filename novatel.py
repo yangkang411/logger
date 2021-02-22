@@ -30,7 +30,7 @@ def parse_novatel_ASC_log(novatel_ref):
     file_dir = os.path.join('data', 'novatel_'+ start_time+'.csv')
     print('Start: {0}'.format(file_dir))
     ref_file = open(file_dir, 'w')
-    header = 'Time,GPS_week,time(sec),lat(deg),lon(deg),alt(m),vel_N(m/s),vel_E(m/s),vel_U(m/s),vel_norm(m/s),roll(deg),pitch(deg),yaw(deg)'
+    header = 'Time,GPS_week,time(sec),status,lat(deg),lon(deg),alt(m),vel_N(m/s),vel_E(m/s),vel_U(m/s),vel_norm(m/s),roll(deg),pitch(deg),yaw(deg)'
     ref_file.write(header + '\n')
     ref_file.flush()
 
@@ -54,13 +54,14 @@ def parse_novatel_ASC_log(novatel_ref):
                     pitch = item[19]    # deg
                     yaw = item[20]      # deg
 
+                    status = item[9];
                     time_gps = gps.gpst2time(int(GPS_week), float(GPS_second))
                     time_utc = gps.gpst2utc(time_gps)
                     time = gps.time2epoch(time_utc)
                     time_stamp = time.strftime("%Y-%m-%d_%H:%M:%S.%f")[:-3]
 
-                    str = '{0},{1},{2},{3},{4},{5},{6:f},{7:f},{8:f},{9:f},{10},{11},{12}\n'.  \
-                        format(time_stamp, GPS_week, GPS_second, latitude,longitude,altitude,   \
+                    str = '{0},{1},{2},{3},{4},{5},{6},{7:f},{8:f},{9:f},{10:f},{11},{12},{13}\n'.  \
+                        format(time_stamp, GPS_week, GPS_second, status, latitude,longitude,altitude,   \
                                vel_N,vel_E,vel_U,vel_norm,roll,pitch,yaw)
 
                     ref_file.write(str)
@@ -127,7 +128,7 @@ if __name__ == '__main__':
     # parse_novatel_ASC_log(sys.argv[1])
     # generate_vel_sim(sys.argv[1])
 
-    f = '/Users/songyang/project/analyze/drive_test/2020-11-30/data/novatel_CPT7-2020_11_30_13_46_06.ASC'
+    f = '/Users/songyang/project/analyze/drive_test/2021-2-7/data/novatel_CPT7-2021_02_07_14_13_44.ASC'
     parse_novatel_ASC_log(f)
 
     # f = '/Users/songyang/project/code/github/logger/data/novatel_20200617_152310.csv'
