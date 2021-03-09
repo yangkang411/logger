@@ -251,11 +251,55 @@ class CanSender:
                     print("[{0}]:Sending wheel speed msg counter: {1}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.lines))
                     sys.stdout.flush()
         pass
-            
+
+    def send_pgn126720_msg(self):
+        '''
+            1. Sending PGN126720 JD accelerations message.
+            2. Message rate of PGN126720 messate is 100Hz, fake data: [-320, -319, ... 321, 322, -320, -319, ... 321, 322 ...] m/s^2
+            3. Note:
+                . JD Accelerations data order in payload : [acc_Y, acc_X, acc_Z]
+                . JD Accelerations is in NWU frame but not NED.
+
+        '''
+        msg_rate = 100            # 100 Hz
+        send_data_circle = 100    # 
+        acc_data = [0] * 8
+        self.lines = 0
+
+        acc_id = self.can_parser.generate_PDU(Priority = 6, PGN = 126720, SA = 0X88)
+
+        for t in range(send_data_circle):
+            for s in range(-320, 323):  # range: [-320, 322] m/s^2
+                # Construct JD acceleration CAN message.
+                acc = (s + 320) * 100   # m/s^2
+                # Accel Order in payload : [acc_Y, acc_X, acc_Z]
+                # acc_data[1] = acc%256
+                # acc_data[2] = int(acc/256)
+                acc_data[1] = acc & 0XFF
+                acc_data[2] = acc >> 8
+                acc_data[3] = acc_data[1]
+                acc_data[4] = acc_data[2]
+                acc_data[5] = acc_data[1]
+                acc_data[6] = acc_data[2]
+
+                # Send JD acceleration CAN message.
+                m = can.Message(arbitration_id = acc_id, data = acc_data, extended_id = True)
+                self.can0.send(m)
+                
+                # print(s, (acc_data[2] * 256 + acc_data[1]) * 0.01 - 320)
+                time.sleep(1/msg_rate)  #
+
+                ##
+                self.lines += 1
+                if self.lines % 1000 == 0:
+                    print("[{0}]:Sending JD accel msg counter: {1}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.lines))
+                    sys.stdout.flush()
+        pass
 
 if __name__ == "__main__":
     drv = CanSender()
-    drv.send_Carola_CAN_msg()
+    # drv.send_Carola_CAN_msg()
     # drv.send_pgn65215_msg()
     # drv.send_pgn65265_msg()
+    drv.send_pgn126720_msg()
 
