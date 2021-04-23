@@ -271,6 +271,7 @@ class IMULogger:
         elif self.packet_type == 'z1':
             self.handle_packet_z1(frame)
         elif self.packet_type == 's1':
+            self.handle_packet_s1(frame)
             pass
         elif self.packet_type == 'S1':
             self.handle_packet_S1(frame)
@@ -638,6 +639,65 @@ class IMULogger:
         if self.lines % 1000 == 0:
             print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
             sys.stdout.flush()
+
+    def handle_packet_s1(self, frame):
+        '''
+        Parse 's1' packet.
+        
+        typedef struct {
+            uint32_t tstmp;
+            double   dbTstmp;
+            float    accel_g[3];
+            float    rate_dps[3];
+            float    mag_G[3];
+            float    temp_C;
+        }scaled1_payload_t;
+        '''
+        PAYLOAD_IDX = 5
+        PAYLOAD_LEN = frame[4] #47
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
+        
+        pack_fmt = '<Id10f'
+        len_fmt = '{0}B'.format(PAYLOAD_LEN)
+        payload = frame[PAYLOAD_IDX : -2]
+
+        if self.first_line:
+            self.first_line = False
+            if not os.path.exists('data/'):
+                os.mkdir('data/')
+            self.port = self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200
+            file_dir = os.path.join('data', self.packet_type+'_' + self.start_time + '_' + self.port + '.csv')
+            print('Start logging:{0}'.format(file_dir))
+            self.data_file = open(file_dir, 'w')
+
+            header = 'pc_tm, tstmp, dbTstmp,            \
+                    acc_x, acc_y, acc_z,                \
+                    gyro_x, gyro_y, gyro_z,             \
+                    mag_x, mag_y, mag_z, temp_C'.replace(' ', '')
+            self.data_file.write(header + '\n')
+            self.data_file.flush()
+
+        try:
+            b = struct.pack(len_fmt, *payload)
+            d = struct.unpack(pack_fmt, b)
+        except Exception as e:
+            print("Decode payload error: {0}".format(e)) 
+
+        str = '{0},{1:d},{2:f},{3:f},{4:f},         \
+            {5:f},{6:f},{7:f},{8:f},{9:f},{10:f},   \
+            {11:d},{12:d}'                   \
+            .format(tm_ms,d[0],d[1],d[2],d[3],      \
+                d[4],d[5],d[6],d[7],d[8],d[9],      \
+                d[10],d[11]).replace(' ', '')
+
+        self.data_file.write(str + '\n')
+        self.data_file.flush()
+        self.lines += 1
+
+        if self.lines % 1000 == 0:
+            print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
+            sys.stdout.flush()
+
 
     def handle_packet_S1(self, frame):
         '''
