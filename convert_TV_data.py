@@ -98,9 +98,20 @@ def convret(tv_raw_data_file):
                 print('Error at line {0} :{1}'.format(idx,e))
                 line = f.readline()
 
+def Batch(path):
+    for root, dirs, files in os.walk(path):
+        for name in files:
+            tv_raw_data_file = os.path.join(root, name) # eg. '/Volumes/productionbackup/dmudata/dmu305/20XXXXXXXX/2003017287/SN2003017287_MTLT305E-400_2020-08-23@20.09.54_Oven_Verify_Raw_B.txt'
+            if tv_raw_data_file.endswith('_Oven_Verify_Raw_B.txt'):
+                print(tv_raw_data_file)
+                convret(tv_raw_data_file)
 
 if __name__ == '__main__':
     # tv_raw_data_file = sys.argv[1]
+    tv_raw_data_file = '/Users/songyang/Desktop/a/305DVSE/analyze/report/2103300046/SN2103300046_MTLT305E-400_2021-05-08@10.43.59_Oven_Verify_Raw_B.txt'
     convret(tv_raw_data_file)
+
+    # path = '/Users/songyang/Desktop/a/305DVSE/analyze/report/'
+    # Batch(path);
 
 # '/Volumes/productionbackup/dmudata/dmu305/20XXXXXXXX/2003017287/SN2003017287_MTLT305E-400_2020-08-23@20.09.54_Oven_Verify_Raw_B.txt'

@@ -7,7 +7,7 @@ from datetime import datetime
 
 def killProcess():
     print('Start at:{0}'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-    time.sleep(12 * 3600) # 12 Hours
+    time.sleep(10 * 3600) # 10 Hours
     os.system('taskkill /f /im %s' % 'DataAcquire.exe')
     print('Stop at:{0}'.format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
 
