@@ -1,0 +1,52 @@
+
+'''
+DLC: Date Length Code
+
+Parse CAN msg: 
+    0cf029a2(Hex),  217065890(Dec)
+    Bin:   
+    011           0     0     1111 0000    0010 1001    1010 0010
+   |----|       |--|   |--|  |---------|  |---------|  |---------|
+   priority(3)    R     DP      PF(240)      PS(41)       SA(162)
+                |-----------------------------------| 
+                                PGN(61481)
+
+    08f02da2(Hex),  149958050(Dec)
+    Bin:   
+    010           0     0     1111 0000    0010 1101    1010 0010
+   |----|       |--|   |--|  |---------|  |---------|  |---------|
+   priority(2)    R     DP      PF(240)      PS(45)       SA(162)
+                |-----------------------------------| 
+                                PGN(61485)
+
+Log sample:
+Timestamp: 1590135123.813775    ID: 0cf00400    X Rx                DLC:  8    50 7d 82 48 11 00 f0 83     Channel: 1
+Timestamp: 1590135123.818045    ID: 18a7ff85    X Rx                DLC:  8    ff ff 00 00 00 00 00 00     Channel: 1
+Timestamp: 1590135123.818335    ID: 0cf00203    X Rx                DLC:  8    00 00 00 ff f7 d8 10 03     Channel: 1
+Timestamp: 1590135123.820955    ID: 18f0090b    X Rx                DLC:  8    2e 88 20 85 7d 57 7d 7d     Channel: 1
+Timestamp: 1590135123.823045    ID: 18fee6ee    X Rx                DLC:  8    ec 0b 0e 05 57 23 7d 7f     Channel: 1
+Timestamp: 1590135123.823330    ID: 0cf00400    X Rx                DLC:  8    50 7d 82 48 11 00 f0 83     Channel: 1
+Timestamp: 1590135123.823615    ID: 18fec1ee    X Rx                DLC:  8    1d 96 04 00 1d 96 04 00     Channel: 1
+Timestamp: 1590135123.823900    ID: 18f0000f    X Rx                DLC:  8    50 7d 7d ff 00 ff ff 7d     Channel: 1
+Timestamp: 1590135123.824170    ID: 18fef3ee    X Rx                DLC:  8    ee 13 14 9a c6 97 f9 82     Channel: 1
+Timestamp: 1590135123.827775    ID: 18a7fe85    X Rx                DLC:  8    00 00 00 00 00 00 ff ff     Channel: 1
+Timestamp: 1590135123.828285    ID: 0cf00203    X Rx                DLC:  8    00 00 00 ff f7 d8 10 03     Channel: 1
+Timestamp: 1590135123.830965    ID: 18fdc40b    X Rx                DLC:  8    1f 00 5f ff ff ff ff ff     Channel: 1
+Timestamp: 1590135123.832810    ID: 18fef100    X Rx                DLC:  8    f7 4d 00 00 00 46 03 f0     Channel: 1
+Timestamp: 1590135123.833405    ID: 0cf00400    X Rx                DLC:  8    50 7d 82 48 11 00 f0 83     Channel: 1
+Timestamp: 1590135123.838265    ID: 0cf00203    X Rx                DLC:  8    00 00 00 ff f7 ea 10 03     Channel: 1
+Timestamp: 1590135123.840970    ID: 18f0090b    X Rx                DLC:  8    2e 88 20 84 7d 42 7d 7d     Channel: 1
+Timestamp: 1590135123.842870    ID: 0cf00400    X Rx                DLC:  8    50 7d 82 48 11 00 f0 83     Channel: 1
+Timestamp: 1590135123.843160    ID: 0cf00300    X Rx                DLC:  8    f1 00 0c ff ff 0f 76 7d     Channel: 1
+Timestamp: 1590135123.847615    ID: 18febf0b    X Rx                DLC:  8    00 00 7d 7d 7d 7d ff ff     Channel: 1
+Timestamp: 1590135123.848280    ID: 0cf00203    X Rx                DLC:  8    00 00 00 ff f7 ea 10 03     Channel: 1
+Timestamp: 1590135123.849325    ID: 0cf029a2    X Rx                DLC:  8    de e8 7c f6 bc 7d cc 07     Channel: 1
+'''
+
+_____________________________________________________________________________________________
+
+
+
+
+
+
