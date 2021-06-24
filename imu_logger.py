@@ -339,6 +339,17 @@ class IMULogger:
         Request SN and Model, eg. "1808541032" and "MTLT305D-400 5020-1382-01 19.1.6"
         IMU will response 'ID' packet when receive 'GP' packet.
         '''
+        # # set d1 temporarily.
+        # cmd = [0X55, 0X55, 0X75, 0X50, 0X0C, 0X03, 0X00, 0X00, 0X00, 0X64, 0X31, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X8E, 0X2C] # 
+        # self.write(cmd)
+
+        # # set 200Hz temporarily.
+        # time.sleep(0.010)
+        # cmd = [0X55, 0X55, 0X75, 0X50, 0X0C, 0X04, 0X00, 0X00, 0X00, 0XC8, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0XF0, 0XD5] # 
+        # self.write(cmd)
+
+        # send GP 
+        # time.sleep(0.010) #
         cmd = [0X55,0X55,0X47,0X50,0X02,0X49,0X44,0X23,0X3d] # Get Packet Request
         self.write(cmd)
         pass

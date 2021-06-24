@@ -294,11 +294,55 @@ def read_from_CAN_test(file_name):
     can_reader.read()
     can_reader.close_log_files()
 
+def split(file_name):
+    '''
+    If there are several units on CAN bus, <asc_20210623_141100_accel.csv> will contain accel data of 
+    serveral units, for example, in blow log, there are 4 units in CAN bus and get accel data from 
+    4 different units.
+    This function is used to split <asc_20210623_141100_accel.csv> to 4 csv file, which only contains 1 
+    unit accel data.
+
+    time,id,PGN,acc_x,acc_y,acc_z
+    2400.002477,0x8f02d80,61485,-7.360000,0.030000,6.540000
+    2400.005934,0x8f02d81,61485,-0.150000,0.060000,9.820000
+    2400.006486,0x8f02d82,61485,9.700000,0.100000,-1.380000
+    2400.007036,0x8f02d83,61485,-3.890000,-0.090000,-8.990000
+    '''
+    address = {}  # {'address_id' : log_file}
+
+    with open(file_name, 'r', encoding='utf-8') as f:
+        idx = -1
+        line = f.readline()
+
+        (filepath, tempfilename) = os.path.split(file_name)
+        (shotname, extension) = os.path.splitext(tempfilename)
+
+        while line:
+            try:
+                idx += 1
+                item = line.split(',')
+                add  = item[1]
+                if add not in address:
+                    log_file = os.path.join('data', shotname + '_' + add + '.csv')
+                    address[add] = open(log_file, 'w')
+
+                address[add].write(line)
+                line = f.readline()
+            except Exception as e:
+                print('Error at line {0} :{1}'.format(idx,e))    
+    pass
+
 if __name__ == '__main__':
     # file_name = sys.argv[1]
-    # file_name = '/Users/songyang/project/analyze/drive_test/CNH/2020-11-4/data/20201029_EMC_test_sensata_eurocargo/Logging_3.blf'
+    # file_name = '/Users/songyang/project/analyze/drive_test/Hitachi/2021-6-23/data/raw_data/Hitachi_data/DATA2_ACEINNA_Case3_2400-2560.asc'
     # read_from_blf_and_asc(file_name)
 
     # Read and parse CAN-Test csv log.
-    file_name = '/Users/songyang/project/code/github/logger/data/data_2020-11-30/Carola_CAN/2020-11-30/can_log.csv'
-    read_from_CAN_test(file_name)
+    # file_name = '/Users/songyang/project/code/github/logger/data/data_2020-11-30/Carola_CAN/2020-11-30/can_log.csv'
+    # read_from_CAN_test(file_name)
+
+    file_name = './data/asc_20210623_151949_tilt.csv'
+    split(file_name)
+
+
+
