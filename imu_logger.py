@@ -267,7 +267,7 @@ class IMULogger:
         elif self.packet_type == 'a1':
             self.handle_packet_a1(frame)
         elif self.packet_type == 'a2':
-            pass
+            self.handle_packet_a2(frame)
         elif self.packet_type == 'z1':
             self.handle_packet_z1(frame)
         elif self.packet_type == 's1':
@@ -284,7 +284,7 @@ class IMULogger:
         elif self.packet_type == 'A2': # MTLT-305
             self.handle_packet_A2_and_A3(frame, 'A2')
             pass
-        elif self.packet_type == 'A3': # MTLT-305
+        elif self.packet_type == 'A3': # MTLT-335D
             self.handle_packet_A2_and_A3(frame, 'A3')
             pass
         elif self.packet_type == 'd1': # Odometer
@@ -483,6 +483,84 @@ class IMULogger:
             msg['sn'] = self.sn
             msg['version'] = self.version
             msg['type'] = 'a1'
+            msg['data'] = data
+            for app in self.apps:
+                app.on_message(msg)
+
+        if self.lines % 1000 == 0:
+            print("[{0}]:Log counter of {1}: {2}".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), self.port, self.lines))
+            sys.stdout.flush()
+
+    def handle_packet_a2(self, frame):
+        '''
+        Parse 'a2' packet.
+        typedef struct {
+            uint32_t itow;
+            double   dblItow;
+            float    roll;
+            float    pitch;
+            float    yaw;
+            float    corrRates[3];
+            float    accels[3];
+        }angle2_payload_t;
+        '''
+        PAYLOAD_IDX = 5
+        PAYLOAD_LEN = frame[4] #48
+        tm_ms = datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]
+
+        pack_fmt = '<Id9f'
+        len_fmt = '{0}B'.format(PAYLOAD_LEN)
+        payload = frame[PAYLOAD_IDX : -2]
+
+        if self.first_line:
+            self.first_line = False
+            if not os.path.exists('data/'):
+                os.mkdir('data/')
+            self.port = self.cmt.port.split(os.sep)[-1] # /dev/cu.usbserial-143200
+            file_dir = os.path.join('data', self.packet_type+'_' + self.start_time + '_' + self.port + '.csv')
+            print('Start logging:{0}'.format(file_dir))
+            self.data_file = open(file_dir, 'w')
+
+            header = 'pc_tm, itow, dblItow, roll, pitch, yaw      \
+                    gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z'.replace(' ', '')
+            self.data_file.write(header + '\n')
+            self.data_file.flush()
+
+        try:
+            b = struct.pack(len_fmt, *payload)
+            d = struct.unpack(pack_fmt, b)
+        except Exception as e:
+            print("Decode payload error: {0}".format(e)) 
+
+        str = '{0},{1:d},{2:f},{3:f},{4:f},         \
+            {5:f},{6:f},{7:f},{8:f},{9:f},{10:f},   \
+            {11:f}'                   \
+            .format(tm_ms,d[0],d[1],d[2],d[3],      \
+                d[4],d[5],d[6],d[7],d[8],d[9],      \
+                d[10]).replace(' ', '')
+
+        self.data_file.write(str + '\n')
+        self.data_file.flush()
+        self.lines += 1
+
+        if len(self.apps) != 0 and self.sn is not None:
+            data = collections.OrderedDict()
+            data['pc_tm']   = tm_ms
+            data['itow']    = int(d[0])
+            data['dblItow'] = float(d[1])
+            data['roll']    = float(d[2])
+            data['pitch']   = float(d[3])
+            data['yaw']     = float(d[4])
+            data['gyro_x']  = float(d[5])
+            data['gyro_y']  = float(d[6])
+            data['gyro_z']  = float(d[7])
+            data['acc_x']   = float(d[8])
+            data['acc_y']   = float(d[9])
+            data['acc_z']   = float(d[10])
+            msg = {}
+            msg['sn'] = self.sn
+            msg['version'] = self.version
+            msg['type'] = 'a2'
             msg['data'] = data
             for app in self.apps:
                 app.on_message(msg)
