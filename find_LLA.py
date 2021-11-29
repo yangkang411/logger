@@ -45,11 +45,12 @@ def find_idx(nov_file, line_num):
                 span_time_float += 8*3600 # align with UTC+8.
                 # print(span_time_str, span_time_float)
 
-                lat = item[3]
-                lon = item[4]
-                alt = item[5]
-                roll  = item[10]
-                pitch = item[11]
+                offset = 1;  # 后来log的Novatel数据中，增加了一列用于表示状态，比如'15826;INS_SOLUTION_GOOD',所以索引号需要做调整。
+                lat = item[3 + offset]
+                lon = item[4 + offset]
+                alt = item[5 + offset]
+                roll  = item[10 + offset]
+                pitch = item[11 + offset]
 
                 print('''Novatel info: 
                 file_idx: {0}
@@ -66,8 +67,10 @@ def find_idx(nov_file, line_num):
 
 
 if __name__ == '__main__':
-    find_idx(sys.argv[1], sys.argv[2])
+    # find_idx(sys.argv[1], sys.argv[2])
 
-    # nov_file = '/Users/songyang/project/analyze/drive_test/2020-11-2/data/novatel_20201102_163214.csv'
-    # line_num = '1000'
-    # find_idx(nov_file, line_num)
+    nov_file = '/Users/songyang/project/analyze/drive_test/2021-2-7/data/novatel_20210207_153517.csv'
+    line_num = '6000'
+    find_idx(nov_file, line_num)
+
+
