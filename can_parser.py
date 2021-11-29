@@ -12,6 +12,7 @@ import sys
 import math
 from enum import Enum
 import datetime
+import struct
 
 
 class PGNType(Enum):
@@ -223,6 +224,34 @@ class CANParser():
         '''
         gear = msg[1]
         return (gear,)
+
+    def parse_GPS_LLA(self, msg):
+        '''
+        Parse latitude or longitude or altitude info from SANY GPS CAN msg.
+        
+        in: CAN msg
+        out: in [degree] if latitude or longitude, in [meter] if altitude.
+        '''
+        pack_fmt = '<1d'.format(8)
+        len_fmt = '8B'
+        b = struct.pack(len_fmt, *msg)
+        d = struct.unpack(pack_fmt, b)
+        return (d[0],)
+
+    def parse_GPS_angle(self, msg):
+        '''
+        Parse yaw and slop info from SANY GPS CAN msg.
+        
+        in: CAN msg
+        out: in [degree]
+             yaw
+             slop
+        '''
+        pack_fmt = '<2f'.format(8)
+        len_fmt = '8B'
+        b = struct.pack(len_fmt, *msg)
+        d = struct.unpack(pack_fmt, b)
+        return (d[0], d[1])
 
 if __name__ == '__main__':    
     pass
