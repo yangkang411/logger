@@ -79,12 +79,9 @@ class TrcReader():
                         continue
                     if line == '':
                         continue
-                    # if idx > 100:
-                    #     break
 
-                    id = line[31:40]
-                    msg = line[48:71]
-                    tm = line[15:22]
+                    # (id, msg, tm) = self.getFields(line, 'Hyundai')
+                    (id, msg, tm) = self.getFields(line, 'Hitachi')
 
                     id = int(id, 16)
                     msg = msg.split(' ')
@@ -126,6 +123,7 @@ class TrcReader():
                 except Exception as e:
                     print('Error at line {0} :{1}'.format(idx,e))
 
+            return;
             g = 9.80665
             gyro  = np.array(gyro)
             gyro  = gyro.reshape(-1,3)
@@ -163,6 +161,17 @@ class TrcReader():
             mat_path = os.path.join('data', '[{0}].mat'.format(shotname))
             io.savemat(mat_path, tmp)
 
+    def getFields(self, line, customer):
+        if 'Hyundai' == customer:
+            id = line[31:40]
+            msg = line[48:71]
+            tm = line[15:22]
+        elif 'Hitachi' == customer:
+            id = line[28:36]
+            msg = line[41:64]
+            tm = line[10:20]
+        return (id, msg, tm)
+
 def read_from_trc_logfile(file_name):
     '''
     '''
@@ -172,19 +181,19 @@ def read_from_trc_logfile(file_name):
 
 if __name__ == '__main__':
     # For single file
-    # file_name = '/Users/songyang/project/analyze/drive_test/Hyundai/2021-6-25/data/210616_ACE_CAN_Logged/210616_ACE_Last_10_10_10_Test10_filtered.trc'
-    # read_from_trc_logfile(file_name)
+    file_name = '/Users/songyang/project/analyze/drive_test/Hitachi/2021-11-15/data/raw_data/SensorData_20211115/front3.trc'
+    read_from_trc_logfile(file_name)
 
     # For folder
-    folder = '/Users/songyang/project/analyze/drive_test/Hyundai/2021-6-25/data/210616_ACE_CAN_Logged'
-    for root, dirs, files in os.walk(folder):
-        for file in files:
-            item = os.path.join(root, file)
-            fmt = os.path.splitext(item)[-1]
-            if fmt.lower() != '.trc':
-                continue
-            else:
-                read_from_trc_logfile(item)
+    # folder = '/Users/songyang/project/analyze/drive_test/Hyundai/2021-6-25/data/210616_ACE_CAN_Logged'
+    # for root, dirs, files in os.walk(folder):
+    #     for file in files:
+    #         item = os.path.join(root, file)
+    #         fmt = os.path.splitext(item)[-1]
+    #         if fmt.lower() != '.trc':
+    #             continue
+    #         else:
+    #             read_from_trc_logfile(item)
 
 
 
