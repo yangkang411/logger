@@ -123,7 +123,8 @@ class CanReader():
         (_Priority, _PGN, _PF, _PS, _SA) = can_parser.parse_PDU(msg.arbitration_id)
 
         data = None
-        str = '{0:f},{1},{2},'.format(msg.timestamp, hex(msg.arbitration_id), _PGN)
+        # timestamp, channel, id, PGN
+        str = '{0:f},{1},{2},{3},'.format(msg.timestamp, msg.channel + 1, hex(msg.arbitration_id), _PGN)
 
         if _PGN == PGNType.SSI2.value:    # Slope Sensor Information 2
             data = can_parser.parse_tilt(msg.data)
@@ -308,7 +309,7 @@ def split(file_name):
     2400.006486,0x8f02d82,61485,9.700000,0.100000,-1.380000
     2400.007036,0x8f02d83,61485,-3.890000,-0.090000,-8.990000
     '''
-    address = {}  # {'address_id' : log_file}
+    address = {}  # {'addressId_channel' : log_file}
 
     with open(file_name, 'r', encoding='utf-8') as f:
         idx = -1
@@ -321,7 +322,7 @@ def split(file_name):
             try:
                 idx += 1
                 item = line.split(',')
-                add  = item[1]
+                add = '{0}_ch{1}'.format(item[2],item[1])
                 if add not in address:
                     log_file = os.path.join('data', shotname + '_' + add + '.csv')
                     address[add] = open(log_file, 'w')
@@ -334,15 +335,16 @@ def split(file_name):
 
 if __name__ == '__main__':
     # file_name = sys.argv[1]
-    # file_name = '/Users/songyang/project/analyze/drive_test/Hitachi/2021-6-23/data/raw_data/Hitachi_data/DATA2_ACEINNA_Case3_2400-2560.asc'
-    # read_from_blf_and_asc(file_name)
+    # file_name = '/Users/songyang/project/analyze/drive_test/Hitachi/2021-12-10/data/DataFile20211210/Machine2/5Hz_Aceinna.asc'
+    file_name = '/Users/songyang/project/analyze/drive_test/Hitachi/2022-3-3/data/raw/20220303/logfile_Ch4_Ch5_2022-02-15_09-50-26.asc'
+    read_from_blf_and_asc(file_name)
 
     # Read and parse CAN-Test csv log.
     # file_name = '/Users/songyang/project/code/github/logger/data/data_2020-11-30/Carola_CAN/2020-11-30/can_log.csv'
     # read_from_CAN_test(file_name)
 
-    file_name = './data/asc_20210623_151949_tilt.csv'
-    split(file_name)
+    # file_name = './data/asc_20220304_155210_tilt.csv'
+    # split(file_name)
 
 
 
